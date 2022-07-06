@@ -44,7 +44,7 @@ public class BaseActivity extends Activity implements KeyEvents {
         Log.d(TAG,"onResume");
         super.onResume();
 
-        setColorDepth(true);
+        setColorDepth(false);
         notifyAppInfo();
 
         displayManager = new DisplayManager();
@@ -68,8 +68,6 @@ public class BaseActivity extends Activity implements KeyEvents {
     protected void onPause() {
         Log.d(TAG,"onPause");
         super.onPause();
-
-        setColorDepth(false);
 
         displayManager.releaseDisplayStatusListener();
         displayManager.finish();
@@ -132,6 +130,7 @@ public class BaseActivity extends Activity implements KeyEvents {
     }
 
     protected void setColorDepth(boolean highQuality) {
+        /* Enabling highQuality makes A7R hang forever when shooting JPEGs (fine for RAW though!) */
         Gpelibrary.GS_FRAMEBUFFER_TYPE type = highQuality ? Gpelibrary.GS_FRAMEBUFFER_TYPE.ABGR8888 : Gpelibrary.GS_FRAMEBUFFER_TYPE.RGBA4444;
         Gpelibrary.changeFrameBufferPixel(type);
     }

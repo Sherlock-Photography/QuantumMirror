@@ -3,7 +3,6 @@ package com.obsidium.bettermanual;
 import android.os.Handler;
 import android.view.View;
 
-import com.obsidium.bettermanual.camera.CaptureSession;
 import com.sony.scalar.hardware.avio.DisplayManager;
 
 /**
@@ -18,13 +17,9 @@ public interface ActivityInterface {
     void closeApp();
     void setColorDepth(boolean highQuality);
     void loadFragment(int fragment);
-    void setSurfaceViewOnTouchListner(View.OnTouchListener onTouchListner);
+    void setSurfaceViewOnTouchListener(View.OnTouchListener onTouchListener);
     String getResString(int id);
-    void setCaptureDoneEventListner(CaptureSession.CaptureDoneEvent eventListner);
-    boolean isCaptureInProgress();
-    boolean isBulbCapture();
-    void cancelBulbCapture();
-    void setBulbCapture(boolean bulbCapture);
     AvIndexManager getAvIndexManager();
 
+    void takePhoto();
 }

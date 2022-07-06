@@ -2,14 +2,17 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="match_parent">
 
-
-
     <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/surfaceParentView">
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/surfaceParentView">
 
     </FrameLayout>
+
+    <com.github.ma1co.pmcademo.app.ScalingBitmapView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/imageView" android:visibility="visible"/>
 
     <TextView
         android:id="@+id/iv_zoom"
@@ -17,5 +20,13 @@
         android:layout_height="wrap_content"
         android:background="@color/backcolortransparent"
         android:text="Zoom" />
+
+    <TextView
+            android:id="@+id/iv_photonum"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentBottom="true"
+            android:text=""/>
 
 </RelativeLayout>

@@ -15,14 +15,19 @@ public class CustomExceptionHandler implements Thread.UncaughtExceptionHandler
         this.defaultUEH = Thread.getDefaultUncaughtExceptionHandler();
     }
 
-    public void uncaughtException(Thread t, Throwable e) {
-        e.printStackTrace();
+    public static String stacktraceToString(Throwable e) {
         final Writer result = new StringWriter();
         final PrintWriter printWriter = new PrintWriter(result);
         e.printStackTrace(printWriter);
-        String stacktrace = result.toString();
         printWriter.close();
-        Logger.error(stacktrace);
+
+        return result.toString();
+    }
+
+    public void uncaughtException(Thread t, Throwable e) {
+        e.printStackTrace();
+
+        Logger.error(stacktraceToString(e));
         defaultUEH.uncaughtException(t, e);
     }
 }

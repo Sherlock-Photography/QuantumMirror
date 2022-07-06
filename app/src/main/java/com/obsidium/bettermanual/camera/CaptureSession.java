@@ -12,9 +12,8 @@ import com.sony.scalar.hardware.CameraEx;
 public class CaptureSession implements Runnable, CameraEx.ShutterListener {
 
     private CameraInstance cameraInstance;
-    private boolean isBulbCapture = false;
     private boolean isCaptureInProgress = false;
-    private CaptureDoneEvent eventListner;
+    private CaptureDoneEvent eventListener;
     private final String TAG = CaptureSession.class.getSimpleName();
     private CameraEx cameraEx;
 
@@ -30,32 +29,6 @@ public class CaptureSession implements Runnable, CameraEx.ShutterListener {
         //cameraInstance.setShutterListener(this);
     }
 
-    /*public void setBulbCapture(boolean bulbCapture)
-    {
-        this.isBulbCapture = bulbCapture;
-    }
-
-    public void setCaptureDoneEventListner(CaptureDoneEvent eventListner)
-    {
-        this.eventListner = eventListner;
-    }
-
-    public boolean isCaptureInProgress()
-    {
-        return isCaptureInProgress;
-    }
-
-    public boolean isBulbCapture()
-    {
-        return isBulbCapture;
-    }
-
-    public void cancelBulbCapture()
-    {
-        isBulbCapture = false;
-        cameraEx.cancelTakePicture();
-    }*/
-
     @Override
     public void run() {
         if (isCaptureInProgress)
@@ -70,20 +43,19 @@ public class CaptureSession implements Runnable, CameraEx.ShutterListener {
      * STATUS_CANCELED = 1;
      * STATUS_ERROR = 2;
      * STATUS_OK = 0;
-     * @param i code
+     * @param captureCode status
      * @param cameraEx2 did capture Image
      */
     @Override
-    public void onShutter(int i, CameraEx cameraEx2) {
-        Log.d(TAG, "onShutter:" + logCaptureCode(i)+ " isBulb:" + isBulbCapture);
+    public void onShutter(int captureCode, CameraEx cameraEx2) {
+        Log.d(TAG, "onShutter:" + logCaptureCode(captureCode));
         Log.d(TAG, "RunMainThread: " + (Thread.currentThread() == Looper.getMainLooper().getThread()));
-        if (!isBulbCapture) {
-            cameraInstance.cancelCapture();
-            //this.cameraEx.startDirectShutter();
-            isCaptureInProgress = false;
-            if (eventListner != null)
-                eventListner.onCaptureDone();
-        }
+
+        // cameraInstance.cancelCapture();
+        //this.cameraEx.startDirectShutter();
+        isCaptureInProgress = false;
+        if (eventListener != null)
+            eventListener.onCaptureDone();
     }
 
     private String logCaptureCode(int status)

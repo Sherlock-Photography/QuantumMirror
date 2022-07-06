@@ -9,7 +9,7 @@ import java.io.IOException;
 
 public class Logger {
     public static File getFile() {
-        return new File(Environment.getExternalStorageDirectory(), "BMANUAL.TXT");
+        return new File(Environment.getExternalStorageDirectory(), "AI-ERR.TXT");
     }
 
     protected static void log(String msg) {

@@ -1,17 +1,21 @@
 package com.obsidium.bettermanual;
 
-import android.content.BroadcastReceiver;
-import android.content.ContentResolver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
+import android.content.*;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.net.Uri;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 
+import com.github.ma1co.openmemories.framework.DateTime;
 import com.github.ma1co.openmemories.framework.ImageInfo;
 import com.sony.scalar.media.AvindexContentInfo;
 import com.sony.scalar.provider.AvindexStore;
+
+import java.io.*;
+import java.util.Locale;
 
 /**
  * Created by KillerInk on 29.09.2017.
@@ -32,21 +36,6 @@ import com.sony.scalar.provider.AvindexStore;
 
 public class AvIndexManager extends BroadcastReceiver
 {
-
-    public static boolean isSupported()
-    {
-        try
-        {
-            Class avindex =  Class.forName("com.sony.scalar.provider.AvindexStore");
-            return true;
-        }
-        catch (ClassNotFoundException ex)
-        {
-            Log.e(TAG, ex.getMessage());
-            return false;
-        }
-    }
-
     private static final String TAG = AvIndexManager.class.getSimpleName();
 
     private ContentResolver contentResolver;
@@ -55,14 +44,22 @@ public class AvIndexManager extends BroadcastReceiver
     private Context context;
     private long _id;
 
+    private final String idFieldName, sortFieldName;
+
     public IntentFilter MEDIA_INTENTS = new IntentFilter();
     public IntentFilter AVAILABLE_SIZE_INTENTS = new IntentFilter("com.sony.scalar.providers.avindex.action.AVINDEX_MEDIA_AVAILABLE_SIZE_CHANGED");
 
-    public AvIndexManager(ContentResolver contentResolver,Context context)
+    public AvIndexManager(ContentResolver contentResolver, Context context)
     {
         this.context = context;
         this.contentResolver = contentResolver;
-        mediaStorageUri = AvindexStore.Images.Media.getContentUri(AvindexStore.getExternalMediaIds()[0]);
+        this.mediaStorageUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        this.idFieldName = MediaStore.Images.Media._ID;
+        this.sortFieldName = MediaStore.Images.Media.DATE_TAKEN;
+    }
+
+    public ContentResolver getContentResolver() {
+        return contentResolver;
     }
 
     public void onResume(Context context)
@@ -72,7 +69,7 @@ public class AvIndexManager extends BroadcastReceiver
 
     private Cursor getCursorFromUri(Uri uri)
     {
-        return contentResolver.query(uri, AvindexStore.Images.Media.ALL_COLUMNS, null, null,AvindexStore.Images.ImageColumns.CONTENT_CREATED_LOCAL_DATE_TIME +" DESC");
+        return contentResolver.query(uri, new String[]{idFieldName, MediaStore.Images.Media.DATA}, null, null, sortFieldName +" DESC");
     }
 
 
@@ -84,17 +81,18 @@ public class AvIndexManager extends BroadcastReceiver
 
     public String getData()
     {
-        return cursor.getString(cursor.getColumnIndexOrThrow(AvindexStore.Images.ImageColumns.DATA));
+        String filename = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Images.ImageColumns.DATA));
+
+        String storagePrefix = Environment.getExternalStorageDirectory().toString();
+
+        // Inside the SD card mount we're only allowed to access DOS-style 8.3 paths where all letters are capital!
+        filename = storagePrefix + filename.replace(storagePrefix, "").toUpperCase();
+
+        return filename;
     }
 
-    public String getFolder()
-    {
-        return cursor.getString(cursor.getColumnIndexOrThrow(AvindexStore.Images.ImageColumns.DCF_FOLDER_NUMBER));
-    }
-
-    public String getFileName()
-    {
-        return cursor.getString(cursor.getColumnIndexOrThrow(AvindexStore.Images.ImageColumns.DCF_FILE_NUMBER));
+    public Uri getUri() {
+        return ContentUris.withAppendedId(mediaStorageUri, Long.parseLong(getId()));
     }
 
     /**
@@ -104,32 +102,9 @@ public class AvIndexManager extends BroadcastReceiver
         return ImageInfo.create(context, mediaStorageUri, _id);
     }
 
-    public boolean existsJpeg()
-    {
-        if (Integer.parseInt(cursor.getString(cursor.getColumnIndexOrThrow(AvindexStore.Images.ImageColumns.EXIST_JPEG)))> 0)
-            return true;
-        else
-            return false;
-    }
-
-    public boolean existsRaw()
-    {
-        if (Integer.parseInt(cursor.getString(cursor.getColumnIndexOrThrow(AvindexStore.Images.ImageColumns.EXIST_RAW)))> 0)
-            return true;
-        else
-            return false;
-    }
-
     public String getId()
     {
-        return cursor.getString(cursor.getColumnIndexOrThrow("_id"));
-    }
-
-    public AvindexContentInfo getContentInfo()
-    {
-        if (cursor.getCount() == 0)
-            return null;
-        return AvindexStore.Images.Media.getImageInfo(getId());
+        return cursor.getString(cursor.getColumnIndexOrThrow(idFieldName));
     }
 
     public void update()
@@ -174,11 +149,65 @@ public class AvIndexManager extends BroadcastReceiver
     @Override
     public void onReceive(Context context, Intent intent) {
         Log.d(TAG,intent.getAction());
-        //update();
     }
 
-    public byte[] getFullImage() {
-        return AvindexStore.Images.Media.getJpegImage(contentResolver, mediaStorageUri, _id);
+
+    private static void copyStream(InputStream source, OutputStream target) throws IOException {
+        byte[] buf = new byte[8192];
+        int length;
+        while ((length = source.read(buf)) > 0) {
+            target.write(buf, 0, length);
+        }
     }
 
+    public String importImage(InputStream in) {
+        Log.d(TAG, "Importing image...");
+
+        ContentValues values = new ContentValues();
+
+        values.put(MediaStore.Images.Media.TITLE, "");
+        values.put(MediaStore.Images.Media.DESCRIPTION, "");
+        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+
+        long epochTime = DateTime.getInstance().getCurrentTime().getTimeInMillis() / 1000;
+        values.put(MediaStore.Images.Media.DATE_ADDED, epochTime);
+        values.put(MediaStore.Images.Media.DATE_TAKEN, epochTime);
+        values.put(MediaStore.Images.Media.DATE_MODIFIED, epochTime);
+
+        Uri url = null;
+        String stringUrl = null;
+
+        try {
+            url = contentResolver.insert(mediaStorageUri, values);
+
+            OutputStream out = contentResolver.openOutputStream(url);
+
+            try {
+                copyStream(in, out);
+            } finally {
+                out.close();
+            }
+
+            /*
+             * We can't create thumbnails because Android will try to insert them into a .thumbnails directory,
+             * and the SDcard provider only allows 8.3 DOS-style filenames.
+             */
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to insert image", e);
+            if (url != null) {
+                contentResolver.delete(url, null, null);
+                url = null;
+            }
+        }
+
+        if (url != null) {
+            stringUrl = url.toString();
+        }
+
+        return stringUrl;
+    }
+
+    public void delete() {
+        contentResolver.delete(getUri(), null, null);
+    }
 }

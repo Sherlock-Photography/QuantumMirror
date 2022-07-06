@@ -79,9 +79,9 @@ public class FocusDriveController extends AbstractController<View,FocusDriveMode
         return model.getMaxPosition();
     }
 
-    public void setFocusPostionChangedEventListner(FocusPostionChangedEvent eventListner)
+    public void setFocusPostionChangedEventListener(FocusPostionChangedEvent eventListener)
     {
-        this.focusPostionChangedEvent = eventListner;
+        this.focusPostionChangedEvent = eventListener;
     }
 
     private final Runnable m_hideFocusScaleRunnable = () -> view.setVisibility(View.GONE);

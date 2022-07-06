@@ -1,34 +1,42 @@
 package com.obsidium.bettermanual.layout;
 
+import android.content.ContentUris;
 import android.content.Context;
 import android.database.Cursor;
-import android.graphics.Point;
-import android.graphics.Rect;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.util.Log;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.github.ma1co.openmemories.framework.ImageInfo;
+import com.github.ma1co.pmcademo.app.ScalingBitmapView;
 import com.obsidium.bettermanual.ActivityInterface;
+import com.obsidium.bettermanual.AvIndexManager;
 import com.obsidium.bettermanual.MainActivity;
 import com.obsidium.bettermanual.R;
-import com.sony.scalar.graphics.OptimizedImage;
-import com.sony.scalar.graphics.OptimizedImageFactory;
+import com.sony.scalar.hardware.avio.DisplayManager;
 import com.sony.scalar.media.AvindexContentInfo;
-import com.sony.scalar.widget.OptimizedImageView;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 
 public class ImageFragment extends BaseLayout {
 
     private final String TAG = ImageFragment.class.getSimpleName();
-    private OptimizedImageView imageView;
+    private ScalingBitmapView imageView;
     private FrameLayout surfaceViewParent;
-    OptimizedImage image;
+    Bitmap image;
     AvindexContentInfo info;
     private float scaleFactor = 1;
     private final float scaleStep = 0.2f;
     private final float maxScaleFactor = 8;
     private TextView zoomImageView;
+
+    private TextView photoNumView;
     private boolean zoomEnabled = false;
 
     public ImageFragment(Context context,ActivityInterface activityInterface) {
@@ -37,12 +45,12 @@ public class ImageFragment extends BaseLayout {
         surfaceViewParent = (FrameLayout) findViewById(R.id.surfaceParentView);
         zoomImageView = (TextView)findViewById(R.id.iv_zoom);
         zoomImageView.setVisibility(GONE);
-        imageView = new OptimizedImageView(getContext());
-        surfaceViewParent.addView(imageView);
-        imageView.setDisplayPosition(new Point(0,0), OptimizedImageView.PositionType.POS_TYPE_NONE);
+        imageView = (ScalingBitmapView) findViewById(R.id.imageView);
+        photoNumView = (TextView)findViewById(R.id.iv_photonum);
+
         Log.d(TAG, "ImageCount:" + activityInterface.getAvIndexManager().getCount());
         activityInterface.getAvIndexManager().update();
-        loadOptimizedImg();
+        loadImage();
     }
 
     @Override
@@ -52,53 +60,73 @@ public class ImageFragment extends BaseLayout {
 
     @Override
     public void Destroy() {
-        closeImageInfo();
-        closeOptimizedImage();
+        closeImage();
     }
 
-    private void loadOptimizedImg()
+    private void loadImage()
     {
-        if (activityInterface.getAvIndexManager().getPosition() > -1 && activityInterface.getAvIndexManager().getCount() > 0)
+        AvIndexManager avIndexManager = activityInterface.getAvIndexManager();
+
+        int position = avIndexManager.getPosition();
+        int count = avIndexManager.getCount();
+
+        if (position > -1 && count > 0)
         {
-            Log.d(TAG,"MEDIA");
+            String imageFilename = avIndexManager.getData();
+            Log.d(TAG,"Img path:" + imageFilename);
 
-            String data = activityInterface.getAvIndexManager().getData();
-            Log.d(TAG,"Img path:" + data);
-            Log.d(TAG,"Img folder:" + activityInterface.getAvIndexManager().getFolder());
-            Log.d(TAG,"Img name:" + activityInterface.getAvIndexManager().getFileName());
+            try {
+                photoNumView.setText((position + 1) + "/" + count);
 
-            closeImageInfo();
+                BitmapFactory.Options options = new BitmapFactory.Options();
 
-            info = activityInterface.getAvIndexManager().getContentInfo();
-            OptimizedImageFactory.Options options = new OptimizedImageFactory.Options();
-            options.bBasicInfo = false;
-            options.bCamInfo = false;
-            options.bGpsInfo = false;
-            options.bExtCamInfo = false;
-            options.imageType = info.getAttributeInt(AvindexContentInfo.TAG_CONTENT_TYPE,2);
-            options.colorType = info.getAttributeInt(AvindexContentInfo.TAG_COLOR_TYPE,1);
-            options.outContentInfo = info;
+                // First get image size
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(imageFilename, options);
 
-            closeOptimizedImage();
-            image = OptimizedImageFactory.decodeImage(data,options);
-            imageView.setOptimizedImage(image);
+                Log.d(TAG, "Image size " + options.outWidth + ", " + options.outHeight);
+
+                if (options.outWidth == 0 && options.outHeight == 0) {
+                    throw new FileNotFoundException();
+                }
+
+                DisplayManager.VideoRect videoRect = activityInterface.getDisplayManager().getDisplayedVideoRect();
+
+                int scale = Math.max(
+                    Math.max(options.outWidth / (videoRect.pxRight - videoRect.pxLeft), 1),
+                    Math.max(options.outHeight / (videoRect.pxBottom - videoRect.pxTop), 1)
+                );
+
+                options.inJustDecodeBounds = false;
+                options.inSampleSize = scale;
+
+                if (image != null) {
+                    image.recycle();
+                }
+
+                image = BitmapFactory.decodeFile(imageFilename, options);
+                imageView.setImageBitmap(image);
+            } catch (FileNotFoundException e) {
+                Log.e(TAG, Log.getStackTraceString(e));
+
+                // Trim out obsolete thumbnails
+                avIndexManager.delete();
+            } catch (Throwable e) {
+                Log.e(TAG, Log.getStackTraceString(e));
+            } finally {
+                if (image != null && image.isRecycled()) {
+                    // View is really unhappy if it decides to redraw and its bitmap is gone, so:
+                    Bitmap.Config conf = Bitmap.Config.ARGB_8888;
+                    image = Bitmap.createBitmap(16, 16, conf);
+                }
+            }
         }
     }
 
-
-
-    private void closeOptimizedImage() {
+    private void closeImage() {
         if (image != null) {
-            image.release();
+            image.recycle();
             image = null;
-        }
-    }
-
-    private void closeImageInfo() {
-        if (info != null && !info.isRecycled())
-        {
-            info.recycle();
-            info = null;
         }
     }
 
@@ -125,37 +153,11 @@ public class ImageFragment extends BaseLayout {
 
 
     public void moveX(boolean z) {
-        Log.d(TAG,"Change translate. Start");
-        Point point = new Point();
-        if (z) {
-            point.offset(20, 0);
-        } else {
-            point.offset(-20, 0);
-        }
-        OptimizedImageView.LayoutInfo layoutInfo = this.imageView.getLayoutInfo();
-        if (layoutInfo != null) {
-            Rect rect = layoutInfo.drawSize;
-            this.imageView.translate(point, new Point(rect.height(), rect.height()), OptimizedImageView.TranslationType.TRANS_TYPE_INNER_CENTER);
-            imageView.redraw();
-            Log.d(TAG,"Change translate. End");
-        }
+
     }
 
     public void moveY(boolean z) {
-        Log.d(TAG,"Change translate. Start");
-        Point point = new Point();
-        if (z) {
-            point.offset(0, -20);
-        } else {
-            point.offset(0, 20);
-        }
-        OptimizedImageView.LayoutInfo layoutInfo = this.imageView.getLayoutInfo();
-        if (layoutInfo != null) {
-            Rect rect = layoutInfo.drawSize;
-            this.imageView.translate(point, new Point(rect.width(), rect.height()), OptimizedImageView.TranslationType.TRANS_TYPE_INNER_CENTER);
-            imageView.redraw();
-            Log.d(TAG,"Change translate. End");
-        }
+
     }
 
 
@@ -166,42 +168,15 @@ public class ImageFragment extends BaseLayout {
 
     @Override
     public boolean onLowerDialChanged(int value) {
-        if (zoomEnabled) {
-            if (value > 0) {
-                scaleFactor += scaleStep;
-                if (scaleFactor > maxScaleFactor)
-                    scaleFactor = maxScaleFactor;
 
-            } else {
-                scaleFactor -= scaleStep;
-                if (scaleFactor < 1)
-                    scaleFactor = 1;
-            }
-            OptimizedImageView.LayoutInfo info = imageView.getLayoutInfo();
-            if (info != null) {
-                Point mTranslateDenom = new Point(info.imageSize.width(), info.imageSize.height());
-                Point mTranslate = new Point(info.clipSize.centerX(), info.clipSize.centerY());
-
-                imageView.setScale(scaleFactor, OptimizedImageView.BoundType.BOUND_TYPE_LONG_EDGE);
-                info = imageView.getLayoutInfo();
-
-                final int width2 = info.imageSize.width();
-                final int height = info.imageSize.height();
-                final Point point = new Point(info.clipSize.centerX() - width2 * mTranslate.x / mTranslateDenom.x, info.clipSize.centerY() - height * mTranslate.y / mTranslateDenom.y);
-                imageView.translate(point, new Point(width2, height), OptimizedImageView.TranslationType.TRANS_TYPE_INNER_CENTER);
-                imageView.redraw();
-            }
+        if (value < 0)
+        {
+            activityInterface.getAvIndexManager().moveToPrevious();
         }
         else
-        {
-            if (value < 0)
-            {
-                activityInterface.getAvIndexManager().moveToPrevious();
-            }
-            else
-                activityInterface.getAvIndexManager().moveToNext();
-            loadOptimizedImg();
-        }
+            activityInterface.getAvIndexManager().moveToNext();
+        loadImage();
+
         return false;
     }
 
@@ -261,7 +236,7 @@ public class ImageFragment extends BaseLayout {
         }
         else {
             activityInterface.getAvIndexManager().moveToPrevious();
-            loadOptimizedImg();
+            loadImage();
         }
         return false;
     }
@@ -279,7 +254,7 @@ public class ImageFragment extends BaseLayout {
         }
         else {
             activityInterface.getAvIndexManager().moveToNext();
-            loadOptimizedImg();
+            loadImage();
         }
         return false;
     }
@@ -327,6 +302,7 @@ public class ImageFragment extends BaseLayout {
 
     @Override
     public boolean onFocusKeyDown() {
+        activityInterface.loadFragment(MainActivity.FRAGMENT_WAITFORCAMERARDY);
         return false;
     }
 

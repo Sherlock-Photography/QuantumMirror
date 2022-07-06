@@ -8,7 +8,6 @@ import android.view.SurfaceHolder;
 import com.obsidium.bettermanual.Preferences;
 import com.obsidium.bettermanual.controller.ApertureController;
 import com.obsidium.bettermanual.controller.BatteryObserverController;
-import com.obsidium.bettermanual.controller.DriveModeController;
 import com.obsidium.bettermanual.controller.ExposureCompensationController;
 import com.obsidium.bettermanual.controller.ExposureHintController;
 import com.obsidium.bettermanual.controller.ExposureModeController;
@@ -16,11 +15,9 @@ import com.obsidium.bettermanual.controller.FocusDriveController;
 import com.obsidium.bettermanual.controller.HistogramController;
 import com.obsidium.bettermanual.controller.ImageStabilisationController;
 import com.obsidium.bettermanual.controller.IsoController;
-import com.obsidium.bettermanual.controller.LongExposureNoiseReductionController;
 import com.obsidium.bettermanual.controller.ShutterController;
 import com.obsidium.bettermanual.model.ApertureModel;
 import com.obsidium.bettermanual.model.BatteryObserverModel;
-import com.obsidium.bettermanual.model.DriveModeModel;
 import com.obsidium.bettermanual.model.ExposureCompensationModel;
 import com.obsidium.bettermanual.model.ExposureHintModel;
 import com.obsidium.bettermanual.model.ExposureModeModel;
@@ -28,17 +25,20 @@ import com.obsidium.bettermanual.model.FocusDriveModel;
 import com.obsidium.bettermanual.model.HistogramModel;
 import com.obsidium.bettermanual.model.ImageStabilisationModel;
 import com.obsidium.bettermanual.model.IsoModel;
-import com.obsidium.bettermanual.model.LongExposureNoiseReductionModel;
 import com.obsidium.bettermanual.model.ShutterModel;
 import com.sony.scalar.hardware.CameraEx;
 import com.sony.scalar.hardware.CameraSequence;
 import com.sony.scalar.meta.FaceInfo;
+import com.sony.scalar.provider.AvindexStore;
 
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.List;
 import java.util.StringTokenizer;
 
 
-public class CameraInstance extends BaseCamera implements  CameraSequence.ShutterSequenceCallback   {
+public class CameraInstance extends BaseCamera implements CameraSequence.ShutterSequenceCallback {
     private final String TAG = CameraInstance.class.getSimpleName();
 
 //    public CameraSequence cameraSequence;
@@ -52,9 +52,7 @@ public class CameraInstance extends BaseCamera implements  CameraSequence.Shutte
     private ExposureCompensationModel exposureCompensationModel;
     private ExposureHintModel exposureHintModel;
     private ExposureModeModel exposureModeModel;
-    private DriveModeModel driveModeModel;
     private ImageStabilisationModel imageStabilisationModel;
-    private LongExposureNoiseReductionModel longExposureNoiseReductionModel;
     private HistogramModel histogramModel;
     private FocusDriveModel focusDriveModel;
     private BatteryObserverModel batteryObserverModel;
@@ -86,9 +84,6 @@ public class CameraInstance extends BaseCamera implements  CameraSequence.Shutte
 
     public void initParameters()
     {
-
-
-
         apertureModel = new ApertureModel(this);
         m_camera.setApertureChangeListener(apertureModel);
         ApertureController.GetInstance().bindModel(apertureModel);
@@ -111,18 +106,9 @@ public class CameraInstance extends BaseCamera implements  CameraSequence.Shutte
         exposureModeModel = new ExposureModeModel(this);
         ExposureModeController.GetInstance().bindModel(exposureModeModel);
 
-        driveModeModel = new DriveModeModel(this);
-        DriveModeController.GetInstance().bindModel(driveModeModel);
-
         if (isImageStabSupported()) {
             imageStabilisationModel = new ImageStabilisationModel(this);
             ImageStabilisationController.GetInstance().bindModel(imageStabilisationModel);
-        }
-
-        if (isLongExposureNoiseReductionSupported())
-        {
-            longExposureNoiseReductionModel = new LongExposureNoiseReductionModel(this);
-            LongExposureNoiseReductionController.GetIntance().bindModel(longExposureNoiseReductionModel);
         }
 
         focusDriveModel = new FocusDriveModel(this);
@@ -142,13 +128,11 @@ public class CameraInstance extends BaseCamera implements  CameraSequence.Shutte
     }
 
     private void applySettings() {
-        setFocusMode(CameraEx.ParametersModifier.FOCUS_MODE_MANUAL);
         final String sceneMode = Preferences.GET().getSceneMode();
         setSceneMode(sceneMode);
-        setDriveMode(Preferences.GET().getDriveMode());
-        setBurstDriveSpeed(Preferences.GET().getBurstDriveSpeed());
+        setDriveMode(CameraEx.ParametersModifier.DRIVE_MODE_SINGLE);
         // Minimum shutter speed
-        if(isAutoShutterSpeedLowLimitSupported()) {
+        if (isAutoShutterSpeedLowLimitSupported()) {
             if (sceneMode.equals(CameraEx.ParametersModifier.SCENE_MODE_MANUAL_EXPOSURE))
                 setAutoShutterSpeedLowLimit(-1);
             else
@@ -158,38 +142,53 @@ public class CameraInstance extends BaseCamera implements  CameraSequence.Shutte
         setSelfTimer(0);
         // Force aspect ratio to 3:2
         setImageAspectRatio(CameraEx.ParametersModifier.IMAGE_ASPECT_RATIO_3_2);
-        setImageQuality(CameraEx.ParametersModifier.PICTURE_STORAGE_FMT_RAW);
+        setImageQuality(CameraEx.ParametersModifier.PICTURE_STORAGE_FMT_RAWJPEG);
         setRedEyeReduction(CameraEx.ParametersModifier.RED_EYE_REDUCTION_MODE_OFF);
         setFlashType(CameraEx.ParametersModifier.FLASH_TYPE_SLOW_SYNC);
         setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
         m_camera.setFlashChargingStateListener(new CameraEx.FlashChargingStateListener() {
             @Override
             public void onChanged(int i, CameraEx cameraEx) {
-                Log.d(TAG,"FlashChargingStateChanged" + i);
+                Log.d(TAG, "FlashChargingStateChanged" + i);
             }
         });
         m_camera.setFlashEmittingListener(new CameraEx.FlashEmittingListener() {
             @Override
             public void onFlash(boolean b, CameraEx cameraEx) {
-                Log.d(TAG,"FlashEmittingListner changed onFlash " + b);
+                Log.d(TAG, "FlashEmittingListener changed onFlash " + b);
             }
         });
         m_camera.setFocusLightStateListener(new CameraEx.FocusLightStateListener() {
             @Override
             public void onChanged(boolean b, boolean b1, CameraEx cameraEx) {
-                Log.d(TAG,"FocusLightstateChanger onChange " + b + " " + b1);
+                Log.d(TAG, "FocusLightstateChanger onChange " + b + " " + b1);
             }
         });
+
+        /* // Throws NoClassDefFoundError on my A7R:
+
+        m_camera.setStoreImageCompleteListener(new CameraEx.StoreImageCompleteListener() {
+            @Override
+            public void onDone(int i, CameraEx.StoreImageInfo storeImageInfo, CameraEx cameraEx) {
+                Log.d(TAG, "storeImageCompleteListener: " + i);
+                Log.d(TAG, "Fna: " + storeImageInfo.FileName);
+                Log.d(TAG, "Fno: " + storeImageInfo.FileNo);
+                Log.d(TAG, "Dna: " + storeImageInfo.DirectoryName);
+                Log.d(TAG, "Dno: " + storeImageInfo.DirectoryNo);
+                Log.d(TAG, "Mid: " + storeImageInfo.MediaId);
+            }
+        });*/
+
         /*try {
             m_camera.setCaptureStatusListener(new CameraEx.OnCaptureStatusListener() {
                 @Override
                 public void onEnd(int i, int i1, CameraEx cameraEx) {
-                    Log.d(TAG, "onCaptureStatusListner END");
+                    Log.d(TAG, "onCaptureStatusListener END");
                 }
 
                 @Override
                 public void onStart(int i, CameraEx cameraEx) {
-                    Log.d(TAG, "onCaptureStatusListner Start");
+                    Log.d(TAG, "onCaptureStatusListener Start");
                 }
             });
         }
@@ -197,73 +196,67 @@ public class CameraInstance extends BaseCamera implements  CameraSequence.Shutte
         {
             ex.printStackTrace();
         }*/
-        m_camera.setFaceDetectionListener(new CameraEx.FaceDetectionListener() {
-            @Override
-            public void onFaceDetected(FaceInfo[] faceInfos, CameraEx cameraEx) {
-                Log.d(TAG,"onFaceDetected");
-            }
-        });
+            m_camera.setFaceDetectionListener(new CameraEx.FaceDetectionListener() {
+                @Override
+                public void onFaceDetected(FaceInfo[] faceInfos, CameraEx cameraEx) {
+                    Log.d(TAG, "onFaceDetected");
+                }
+            });
+
+        m_camera.stopDirectShutter(null);
     }
 
     public void closeCamera() {
         cameraIsOpen = false;
         Log.d(TAG, "closeCamera");
 
+        // m_camera.setJpegListener(null);
+
         if (exposureModeModel != null)
             Preferences.GET().setSceneMode(exposureModeModel.getStringValue());
-        // Drive mode and burst speed
-        if (driveModeModel != null)
-            Preferences.GET().setDriveMode(driveModeModel.getValue());
-        try {
-            Preferences.GET().setBurstDriveSpeed(getBurstDriveSpeed());
+
+        if (m_camera != null) {
+            ApertureController.GetInstance().bindModel(null);
+            m_camera.setApertureChangeListener(null);
+            apertureModel = null;
+
+            ShutterController.GetInstance().bindModel(null);
+            m_camera.setShutterSpeedChangeListener(null);
+            shutterModel = null;
+
+            IsoController.GetInstance().bindModel(null);
+            m_camera.setAutoISOSensitivityListener(null);
+            isoModel = null;
+
+            ExposureCompensationController.GetInstance().bindModel(null);
+            exposureCompensationModel = null;
+
+            ExposureHintController.GetInstance().bindModel(null);
+            exposureHintModel = null;
+
+            ExposureModeController.GetInstance().bindModel(null);
+            exposureModeModel = null;
+
+            HistogramController.GetInstance().bindModel(null);
+            m_camera.setPreviewAnalizeListener(null);
+            histogramModel = null;
+
+            FocusDriveController.GetInstance().bindModel(null);
+            m_camera.setFocusDriveListener(null);
+            focusDriveModel = null;
+
+            batteryObserverModel.stop();
+            BatteryObserverController.GetInstance().bindModel(null);
+            batteryObserverModel = null;
+
+            /*cameraSequence.setShutterSequenceCallback(null);
+            cameraSequence.release();*/
+            m_camera.getNormalCamera().stopPreview();
+            m_camera.getNormalCamera().release();
+            m_camera.release();
+            m_camera = null;
         }
-        catch (NullPointerException ex)
-        {
-            ex.printStackTrace();
-        }
 
-        ApertureController.GetInstance().bindModel(null);
-        m_camera.setApertureChangeListener(null);
-        apertureModel = null;
-
-        ShutterController.GetInstance().bindModel(null);
-        m_camera.setShutterSpeedChangeListener(null);
-        shutterModel = null;
-
-        IsoController.GetInstance().bindModel(null);
-        m_camera.setAutoISOSensitivityListener(null);
-        isoModel = null;
-
-        ExposureCompensationController.GetInstance().bindModel(null);
-        exposureCompensationModel = null;
-
-        ExposureHintController.GetInstance().bindModel(null);
-        exposureHintModel = null;
-
-        ExposureModeController.GetInstance().bindModel(null);
-        exposureModeModel = null;
-
-        DriveModeController.GetInstance().bindModel(null);
-        driveModeModel = null;
-
-        HistogramController.GetInstance().bindModel(null);
-        m_camera.setPreviewAnalizeListener(null);
-        histogramModel = null;
-
-        FocusDriveController.GetInstance().bindModel(null);
-        m_camera.setFocusDriveListener(null);
-        focusDriveModel = null;
-
-        batteryObserverModel.stop();
-        BatteryObserverController.GetInstance().bindModel(null);
-        batteryObserverModel = null;
-
-        /*cameraSequence.setShutterSequenceCallback(null);
-        cameraSequence.release();*/
-        m_camera.getNormalCamera().stopPreview();
-        m_camera.getNormalCamera().release();
-        m_camera.release();
-        m_camera = null;
         surfaceHolder = null;
     }
 
@@ -306,7 +299,18 @@ public class CameraInstance extends BaseCamera implements  CameraSequence.Shutte
                 cameraEx.burstableTakePicture();
             }
         });
+    }
 
+    public void takePictureCallback(Camera.PictureCallback jpegCallback) {
+        getCameraEx().getNormalCamera().takePicture(
+            () -> {
+                Log.d(TAG, "On shutter");
+
+                getCameraEx().cancelTakePicture();
+            },
+            (bytes, camera) -> Log.d(TAG, "On raw " + bytes.length),
+            jpegCallback
+        );
     }
 
     @Override
@@ -339,7 +343,7 @@ public class CameraInstance extends BaseCamera implements  CameraSequence.Shutte
         initParameters();
 
         //when false cameraparameters contains only the active parameters, but supported stuff is missing
-        m_camera.withSupportedParameters(true);
+        // m_camera.withSupportedParameters(true); // ?
     }
 
 

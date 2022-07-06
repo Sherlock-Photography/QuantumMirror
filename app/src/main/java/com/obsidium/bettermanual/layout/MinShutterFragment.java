@@ -45,7 +45,7 @@ public class MinShutterFragment extends BaseLayout implements SeekBar.OnSeekBarC
             setShutterSpeedToUi(info, true);
 
         }
-        ShutterController.GetInstance().setShutterSpeedEventListner(new ShutterController.ShutterSpeedEvent() {
+        ShutterController.GetInstance().setShutterSpeedEventListener(new ShutterController.ShutterSpeedEvent() {
             @Override
             public void onChanged() {
                 setShutterSpeedToUi(ShutterController.GetInstance().getShutterSpeedInfo(),false);
@@ -58,7 +58,7 @@ public class MinShutterFragment extends BaseLayout implements SeekBar.OnSeekBarC
     public void Destroy() {
         // Save minimum shutter speed
         Preferences.GET().setMinShutterSpeed(CameraInstance.GET().getAutoShutterSpeedLowLimit());
-        ShutterController.GetInstance().setShutterSpeedEventListner(null);
+        ShutterController.GetInstance().setShutterSpeedEventListener(null);
     }
 
     private void setShutterSpeedToUi(CameraEx.ShutterSpeedInfo shutterSpeedInfo, boolean updateSeekbarProgress) {

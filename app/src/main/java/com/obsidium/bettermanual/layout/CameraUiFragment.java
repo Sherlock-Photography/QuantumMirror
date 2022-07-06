@@ -14,13 +14,8 @@ import com.obsidium.bettermanual.MainActivity;
 import com.obsidium.bettermanual.Preferences;
 import com.obsidium.bettermanual.R;
 import com.obsidium.bettermanual.camera.CameraInstance;
-import com.obsidium.bettermanual.capture.CaptureModeAfBracket;
-import com.obsidium.bettermanual.capture.CaptureModeBracket;
-import com.obsidium.bettermanual.capture.CaptureModeBulb;
-import com.obsidium.bettermanual.capture.CaptureModeTimelapse;
 import com.obsidium.bettermanual.controller.ApertureController;
 import com.obsidium.bettermanual.controller.Controller;
-import com.obsidium.bettermanual.controller.DriveModeController;
 import com.obsidium.bettermanual.controller.ExposureCompensationController;
 import com.obsidium.bettermanual.controller.ExposureHintController;
 import com.obsidium.bettermanual.controller.ExposureModeController;
@@ -28,7 +23,6 @@ import com.obsidium.bettermanual.controller.FocusDriveController;
 import com.obsidium.bettermanual.controller.HistogramController;
 import com.obsidium.bettermanual.controller.ImageStabilisationController;
 import com.obsidium.bettermanual.controller.IsoController;
-import com.obsidium.bettermanual.controller.LongExposureNoiseReductionController;
 import com.obsidium.bettermanual.controller.ShutterController;
 import com.obsidium.bettermanual.views.GridView;
 import com.obsidium.bettermanual.views.HistogramView;
@@ -50,9 +44,6 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
     private TextView        m_tvLog;
     private TextView        m_tvMsg;
     private HistogramView m_vHist;
-    private ImageView       m_ivTimelapse;
-    private ImageView       m_ivBracket;
-    private ImageView       m_ivAfBracket;
     private GridView m_vGrid;
     private TextView        m_tvHint;
     private View            m_lFocusScale;
@@ -63,13 +54,6 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
     private List<Controller> dialViews;
     private int lastDialView;
 
-    // Timelapse
-
-    private CaptureModeTimelapse timelapse;
-    private CaptureModeBracket bracket;
-    private CaptureModeAfBracket afBracket;
-
-
     private final Runnable  m_hideMessageRunnable = new Runnable()
     {
         @Override
@@ -79,10 +63,9 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
         }
     };
 
-    private Runnable[] gridHistogramViewRunners;
+    private Runnable[] histogramViewRunners;
 
     private int             m_viewFlags;
-    private boolean bulbcapture = false;
 
     public CameraUiFragment(Context context, ActivityInterface activityInterface)
     {
@@ -97,30 +80,15 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
         m_tvLog = (TextView)findViewById(R.id.tvLog);
         m_tvLog.setVisibility(LOGGING_ENABLED ? View.VISIBLE : View.GONE);
 
-        gridHistogramViewRunners = new Runnable[4];
-        gridHistogramViewRunners[0] =() -> {
-            Log.d(TAG, "Histo:false Grid:false");
+        histogramViewRunners = new Runnable[2];
+        histogramViewRunners[0] = () -> {
+            Log.d(TAG, "Histo:false");
             m_vHist.setVisibility(GONE);
-            m_vGrid.setVisibility(GONE);
         };
-        gridHistogramViewRunners[1] = () -> {
-            Log.d(TAG, "Histo:false Grid:true");
-            m_vHist.setVisibility(GONE);
-            m_vGrid.setVisibility(VISIBLE);
-        };
-        gridHistogramViewRunners[2] = () -> {
-            Log.d(TAG, "Histo:true Grid:true");
+        histogramViewRunners[1] = () -> {
+            Log.d(TAG, "Histo:true");
             m_vHist.setVisibility(VISIBLE);
-            m_vGrid.setVisibility(VISIBLE);
         };
-        gridHistogramViewRunners[3] = () -> {
-            Log.d(TAG, "Histo:true Grid:false");
-            m_vHist.setVisibility(VISIBLE);
-            m_vGrid.setVisibility(GONE);
-        };
-
-
-
 
         m_tvMsg = (TextView)findViewById(R.id.tvMsg);
 
@@ -136,38 +104,11 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
         //noinspection ResourceType
         ((ImageView)findViewById(R.id.ivFocusLeft)).setImageResource(getResources().getInteger(R.integer.p_16_dd_parts_rec_focuscontrol_near));
 
-        m_ivBracket = (ImageView)findViewById(R.id.iv_bracket);
-        m_ivBracket.setImageResource(getResources().getInteger(R.integer.p_16_dd_parts_contshot));
-        m_ivTimelapse = (ImageView)findViewById(R.id.iv_timelapse);
-        m_ivTimelapse.setImageResource(getResources().getInteger(R.integer.p_16_dd_parts_43_shoot_icon_setting_drivemode_invalid));
-        m_ivAfBracket = (ImageView)findViewById(R.id.iv_afbracket);
-        m_ivAfBracket.setImageResource(getResources().getInteger(R.integer.p_16_dd_parts_rec_focuscontrol_far));
-
         ExposureModeController.GetInstance().bindView((ImageView) findViewById(R.id.iv_exposuremode));
         dialViews.add(ExposureModeController.GetInstance());
 
-        DriveModeController.GetInstance().bindView((ImageView)findViewById(R.id.iv_drivemode));
-        dialViews.add(DriveModeController.GetInstance());
-
-        bracket = new CaptureModeBracket(this);
-        bracket.bindView((ImageView)findViewById(R.id.iv_bracket));
-        dialViews.add(bracket);
-
-        timelapse = new CaptureModeTimelapse(this);
-        timelapse.bindView(((ImageView)findViewById(R.id.iv_timelapse)));
-        dialViews.add(timelapse);
-
-        afBracket = new CaptureModeAfBracket(this);
-        afBracket.bindView(m_ivAfBracket);
-        dialViews.add(afBracket);
-
-        CaptureModeBulb.CREATE(this);
-
         ImageStabilisationController.GetInstance().bindView((ImageView) findViewById(R.id.iv_imagestab));
         dialViews.add(ImageStabilisationController.GetInstance());
-
-        LongExposureNoiseReductionController.GetIntance().bindView((ImageView)findViewById(R.id.iv_longexponr));
-        dialViews.add(LongExposureNoiseReductionController.GetIntance());
 
         ShutterController.GetInstance().bindView((TextView)findViewById(R.id.shutter_txt));
         dialViews.add(ShutterController.GetInstance());
@@ -186,8 +127,8 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
         ExposureHintController.GetInstance().bindView(m_tvExposure);
         //dialViews.add(ExposureHintController.GetInstance());
 
-                //then set the key event listner to avoid nullpointer
-        activityInterface.getDialHandler().setDialEventListner(CameraUiFragment.this);
+                //then set the key event listener to avoid nullpointer
+        activityInterface.getDialHandler().setDialEventListener(CameraUiFragment.this);
 
         m_vGrid.setVideoRect(activityInterface.getDisplayManager().getDisplayedVideoRect());
 
@@ -223,14 +164,8 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
         ExposureCompensationController.GetInstance().bindView(null);
         ExposureHintController.GetInstance().bindView(null);
         ExposureModeController.GetInstance().bindView(null);
-        DriveModeController.GetInstance().bindView(null);
         ImageStabilisationController.GetInstance().bindView(null);
-        LongExposureNoiseReductionController.GetIntance().bindView(null);
-        timelapse.bindView(null);
-        bracket.bindView(null);
-        afBracket.bindView(null);
         HistogramController.GetInstance().bindView(null);
-        CaptureModeBulb.CLEAR();
     }
 
 
@@ -330,12 +265,12 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
     {
         m_viewFlags += val;
 
-        if (m_viewFlags > gridHistogramViewRunners.length-1)
+        if (m_viewFlags > histogramViewRunners.length-1)
             m_viewFlags = 0;
         if (m_viewFlags < 0)
-            m_viewFlags = gridHistogramViewRunners.length-1;
+            m_viewFlags = histogramViewRunners.length-1;
         Log.d(TAG, "viewFLags:" + m_viewFlags);
-        activityInterface.getMainHandler().post(gridHistogramViewRunners[m_viewFlags]);
+        activityInterface.getMainHandler().post(histogramViewRunners[m_viewFlags]);
     }
 
 
@@ -455,6 +390,7 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
 
     @Override
     public boolean onFocusKeyDown() {
+        hideMessage();
         return false;
     }
 
@@ -534,6 +470,9 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
     public boolean onShutterKeyDown()
     {
         Log.d(TAG,"onShutterKeyDown");
+
+        activityInterface.takePhoto();
+
         return true;
     }
 

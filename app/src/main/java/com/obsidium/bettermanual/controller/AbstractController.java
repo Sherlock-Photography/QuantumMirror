@@ -20,7 +20,7 @@ public abstract class AbstractController<V  extends View, M extends Model> imple
     public synchronized void bindModel(M model) {
         this.model = model;
         if (model != null)
-            model.setListner(this);
+            model.setListener(this);
         onIsSupportedChanged();
     }
 

@@ -29,38 +29,11 @@
            />
 
         <ImageView
-            android:id="@+id/iv_drivemode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            />
-
-        <ImageView
-            android:id="@+id/iv_bracket"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            />
-        <ImageView
-            android:id="@+id/iv_timelapse"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            />
-
-        <ImageView
-            android:id="@+id/iv_afbracket"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <ImageView
             android:id="@+id/iv_imagestab"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             />
 
-        <ImageView
-            android:id="@+id/iv_longexponr"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            />
     </LinearLayout>
 
 
@@ -78,17 +51,14 @@
         android:layout_marginBottom="4dp"/>
 
 
-
     <TextView
-        android:id="@+id/tvMsg"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:layout_centerVertical="true"
-        android:textAppearance="?android:attr/textAppearanceLarge"
-        android:textColor="@android:color/white"
-        android:textSize="@dimen/Msg_textsize"
-        tools:text="Msg" />
+            android:id="@+id/tvMsg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceLarge"
+            android:textColor="@android:color/white"
+            android:textSize="@dimen/Msg_textsize"
+            tools:text="Msg" android:layout_centerInParent="true"/>
 
     <com.obsidium.bettermanual.views.HistogramView
         android:id="@+id/vHist"

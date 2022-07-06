@@ -1,11 +1,16 @@
 package com.obsidium.bettermanual;
 
 import android.app.DAConnectionManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
+import android.content.IntentFilter;
+import android.hardware.Camera;
+import android.net.NetworkInfo;
+import android.net.wifi.SupplicantState;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.os.*;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -16,7 +21,6 @@ import android.widget.TextView;
 
 import com.github.ma1co.pmcademo.app.BaseActivity;
 import com.obsidium.bettermanual.camera.CameraInstance;
-import com.obsidium.bettermanual.camera.CaptureSession;
 import com.obsidium.bettermanual.controller.BatteryObserverController;
 import com.obsidium.bettermanual.controller.ShutterController;
 import com.obsidium.bettermanual.layout.BaseLayout;
@@ -25,7 +29,18 @@ import com.obsidium.bettermanual.layout.ImageFragment;
 import com.obsidium.bettermanual.layout.MinShutterFragment;
 import com.obsidium.bettermanual.layout.PreviewMagnificationFragment;
 import com.sony.scalar.hardware.CameraEx;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
+import com.github.ma1co.openmemories.framework.DateTime;
+
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.concurrent.*;
 
 /**
  * Created by KillerInk on 27.08.2017.
@@ -50,18 +65,25 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
     LinearLayout layoutHolder;
     FrameLayout surfaceViewHolder;
 
-    private boolean isBulbCapture = false;
-    private boolean isCaptureInProgress = false;
-    private CaptureSession.CaptureDoneEvent eventListner;
-
     private BaseLayout currentLayout;
 
     private AvIndexManager avIndexManager;
 
+    private String m_endPointPrefix;
+    private String m_bearerToken;
+    private ExecutorService m_dalleExecutor = Executors.newSingleThreadExecutor();
+
+    private WifiManager wifiManager;
+    private BroadcastReceiver wifiStateReceiver;
+    private BroadcastReceiver supplicantStateReceiver;
+    private BroadcastReceiver networkStateReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Log.d(TAG,"onCreate");
+
+        Preferences.CREATE(getApplicationContext());
+
         super.onCreate(savedInstanceState);
         if (!(Thread.getDefaultUncaughtExceptionHandler() instanceof CustomExceptionHandler))
             Thread.setDefaultUncaughtExceptionHandler(new CustomExceptionHandler());
@@ -71,12 +93,347 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
 
         surfaceViewHolder = (FrameLayout) findViewById(R.id.surfaceView);
         //surfaceView.setOnTouchListener(new CameraUiFragment.SurfaceSwipeTouchListener(getContext()));
-        if (AvIndexManager.isSupported())
-            avIndexManager = new AvIndexManager(getContentResolver(),getApplicationContext());
+        avIndexManager = new AvIndexManager(getContentResolver(),getApplicationContext());
 
         layoutHolder = (LinearLayout)findViewById(R.id.fragment_holder);
-        Preferences.CREATE(getApplicationContext());
 
+        wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+
+        wifiStateReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                wifiStateChanged(intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_UNKNOWN));
+            }
+        };
+
+        supplicantStateReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                networkStateChanged(WifiInfo.getDetailedStateOf((SupplicantState) intent.getParcelableExtra(WifiManager.EXTRA_NEW_STATE)));
+            }
+        };
+
+        networkStateReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                networkStateChanged(((NetworkInfo) intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO)).getDetailedState());
+            }
+        };
+
+        try {
+            loadBearerToken();
+        } catch (Exception e) {
+            Log.e(TAG, "Bad TOKEN.TXT file: " + e);
+            showDallEProgress("Bad TOKEN.TXT file: " + e, false);
+        }
+    }
+
+    private void loadBearerToken() throws IOException {
+        File filename = new File(Environment.getExternalStorageDirectory(), "TOKEN.TXT");
+
+        Log.d(TAG, "Loading bearer token from " + filename.toString());
+
+        BufferedReader reader = new BufferedReader(new FileReader(filename));
+
+        String line = reader.readLine().trim();
+        if (!line.startsWith("http")) {
+            throw new RuntimeException("Missing endpoint url");
+        }
+
+        if (!line.endsWith("/")) {
+            line = line + "/";
+        }
+
+        m_endPointPrefix = line;
+
+        line = reader.readLine().trim();
+
+        if (line.length() < 16) {
+            throw new RuntimeException("Missing bearer token");
+        }
+
+        m_bearerToken = line;
+
+        reader.close();
+    }
+
+    protected void wifiStateChanged(int state) {
+        switch (state) {
+            case WifiManager.WIFI_STATE_ENABLING:
+                reportWiFiState("Enabling wifi");
+                break;
+            case WifiManager.WIFI_STATE_ENABLED:
+                reportWiFiState("Starting wifi");
+                break;
+        }
+    }
+
+    private void showMessageDelayed(String message) {
+        Log.d(TAG, message);
+        if (currentLayout instanceof CameraUiFragment) {
+            ((CameraUiFragment) currentLayout).showMessageDelayed(message);
+        }
+    }
+
+    private void showMessagePersistent(String message) {
+        Log.d(TAG, message);
+        if (currentLayout instanceof CameraUiFragment) {
+            ((CameraUiFragment) currentLayout).showMessage(message);
+        }
+    }
+
+    private void reportWiFiState(String message) {
+        showMessagePersistent(message);
+    }
+
+    protected void networkStateChanged(NetworkInfo.DetailedState state) {
+        String ssid = wifiManager.getConnectionInfo().getSSID();
+        switch (state) {
+            case CONNECTING:
+                if (ssid != null)
+                    reportWiFiState(ssid + ": Connecting");
+                break;
+            case AUTHENTICATING:
+                reportWiFiState(ssid + ": Authenticating");
+                break;
+            case OBTAINING_IPADDR:
+                reportWiFiState(ssid + ": Obtaining IP");
+                break;
+            case CONNECTED:
+                wifiConnected();
+                break;
+            case DISCONNECTED:
+                reportWiFiState("Wifi disconnected");
+                break;
+            case FAILED:
+                reportWiFiState("Connection failed");
+                break;
+        }
+    }
+
+    protected void wifiConnected() {
+        showMessageDelayed("Wifi connected");
+    }
+
+
+    private String readStreamAsString(InputStream in) throws IOException {
+        int bufferSize = 1024;
+        char[] buffer = new char[bufferSize];
+
+        StringBuilder out = new StringBuilder();
+
+        Reader reader = new InputStreamReader(in, "UTF-8");
+
+        for (int numRead; (numRead = reader.read(buffer, 0, buffer.length)) > 0; ) {
+            out.append(buffer, 0, numRead);
+        }
+
+        return out.toString();
+    }
+
+    private void logDallEToFile(String msg) {
+        File file = new File(Environment.getExternalStorageDirectory(), "DALL-E.TXT");
+
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(file, true));
+
+            writer.append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.getInstance().getCurrentTime().getTime()));
+            writer.append(" - ");
+            writer.append(msg);
+            writer.newLine();
+            writer.close();
+        } catch (IOException e) {}
+    }
+
+    private JSONObject uploadDallEPicture(final byte[] bytes) throws IOException, JSONException {
+        URL u = new URL(m_endPointPrefix + "submitImage");
+
+        HttpURLConnection c = (HttpURLConnection) u.openConnection();
+
+        c.setRequestMethod("POST");
+        c.setRequestProperty("X-Authorization", "Bearer " + m_bearerToken);
+        c.setRequestProperty("Content-Type", "application/binary");
+        c.setDoOutput(true);
+        c.setDoInput(true);
+
+        OutputStream out = c.getOutputStream();
+
+        // Maybe we can save memory by chunking our writes here:
+        int chunkSize = 16384;
+        int chunkStart = 0;
+
+        while (chunkStart < bytes.length) {
+            out.write(bytes, chunkStart, Math.min(bytes.length - chunkStart, chunkSize));
+            chunkStart += chunkSize;
+        }
+
+        out.close();
+
+        c.connect();
+
+        if (c.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            throw new IOException("HTTP error " + c.getResponseCode() + " (" + c.getResponseMessage() + ")");
+        }
+
+        InputStream in = c.getInputStream();
+
+        return (JSONObject) new JSONTokener(readStreamAsString(in)).nextValue();
+    }
+
+    private JSONObject pollDallETask(final String taskID) throws IOException, JSONException {
+        URL u = new URL(m_endPointPrefix + "pollTask/" + taskID);
+
+        HttpURLConnection c = (HttpURLConnection) u.openConnection();
+
+        c.setUseCaches(false);
+        c.setRequestMethod("GET");
+        c.setRequestProperty("X-Authorization", "Bearer " + m_bearerToken);
+        c.setDoInput(true);
+
+        c.connect();
+
+        if (c.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            throw new IOException("HTTP error " + c.getResponseCode() + " (" + c.getResponseMessage() + ")");
+        }
+
+        InputStream in = c.getInputStream();
+
+        return (JSONObject) new JSONTokener(readStreamAsString(in)).nextValue();
+    }
+
+    private InputStream startDallEImageDownload(String url) throws IOException {
+        URL u = new URL(url.replace("https://openailabsprodscus.blob.core.windows.net/", m_endPointPrefix + "getImage/"));
+
+        HttpURLConnection c = (HttpURLConnection) u.openConnection();
+
+        c.setUseCaches(false);
+        c.setRequestMethod("GET");
+        c.setDoInput(true);
+
+        c.connect();
+
+        if (c.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            throw new IOException("HTTP error " + c.getResponseCode() + " (" + c.getResponseMessage() + ")");
+        }
+
+        return c.getInputStream();
+    }
+
+    /**
+     * Send messages from the Dall-E threads to the main thread for display.
+     */
+    private void showDallEProgress(final String message, boolean delayedClear) {
+        if (delayedClear) {
+            m_handler.post(() -> showMessageDelayed(message));
+        } else {
+            m_handler.post(() -> showMessagePersistent(message));
+        }
+    }
+
+    private void runDallE(final byte[] jpegBytes) {
+        m_dalleExecutor.execute(() -> {
+            showDallEProgress("Uploading to DALL-E...", false);
+
+            try {
+                JSONObject responseJSON = uploadDallEPicture(jpegBytes);
+                String status = responseJSON.optString("status", "failed");
+                String taskID;
+                boolean success = false;
+
+                if (!("success".equals(status) || "pending".equals(status))) {
+                    // Check for a friendly-formatted error from OpenAI
+                    if (responseJSON.getJSONObject("error") != null) {
+                        String message = responseJSON.getJSONObject("error").getString("message");
+
+                        Log.e(TAG, "Upload error: " + message);
+                        logDallEToFile("Upload error: " + message);
+                        showDallEProgress("Error: " + message, false);
+
+                        return;
+                    }
+
+                    throw new RuntimeException("Task submit failed");
+                }
+
+                taskID = responseJSON.getString("id");
+
+                logDallEToFile("Submitted: https://labs.openai.com/e/" + taskID.replace("task-", ""));
+
+                for (int i = 0; i < 40; i++) {
+                    Log.d(TAG, "DALL-e task status: " + status);
+
+                    if ("pending".equals(status)) {
+                        showDallEProgress("AI working...", false);
+
+                        Thread.sleep(3000);
+                        responseJSON = pollDallETask(taskID);
+
+                        status = responseJSON.getString("status");
+                    } else if ("succeeded".equals(status)) {
+                        success = true;
+                        break;
+                    } else {
+                        throw new RuntimeException("Task failed");
+                    }
+                }
+
+                if (!success) {
+                    throw new RuntimeException("Timed out waiting for AI");
+                }
+
+                showDallEProgress("Downloading images...", false);
+
+                JSONArray generations = responseJSON.getJSONObject("generations").getJSONArray("data");
+
+                CountDownLatch downloadCounter = new CountDownLatch(generations.length());
+
+                for (int i = 0; i < generations.length(); i++) {
+                    JSONObject generation = generations.getJSONObject(i);
+                    final String imageURL = generation.getJSONObject("generation").getString("image_path");
+
+                    m_handler.post(() -> {
+                        try {
+                            avIndexManager.importImage(startDallEImageDownload(imageURL));
+                        } catch (IOException e) {
+                            Log.e(TAG, e.toString());
+                        } finally {
+                            downloadCounter.countDown();;
+                        }
+                    });
+                }
+
+                downloadCounter.await();
+
+                m_handler.post(() -> {
+                    showMessageDelayed("Complete!");
+                });
+            } catch (final Exception e) {
+                Log.e(TAG, "Upload error: " + CustomExceptionHandler.stacktraceToString(e));
+                logDallEToFile("Upload error: " + CustomExceptionHandler.stacktraceToString(e));
+                showDallEProgress("Error: " + e, false);
+            }
+        });
+    }
+
+    public void takePhoto() {
+        m_handler.post(new Runnable() {
+            @Override
+            public void run() {
+                CameraInstance.GET().takePictureCallback(new Camera.PictureCallback() {
+                        @Override
+                        public void onPictureTaken(byte[] bytes, Camera camera) {
+                            Log.d(TAG, "Captured jpeg, size: " + bytes.length);
+
+                            if (m_bearerToken != null) {
+                                runDallE(bytes);
+                            } else {
+                                showDallEProgress("No TOKEN.TXT file found!", true);
+                            }
+                        }
+                    }
+                );
+            }
+        });
     }
 
     @Override
@@ -87,12 +444,26 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
         if (avIndexManager != null) {
             registerReceiver(avIndexManager, avIndexManager.AVAILABLE_SIZE_INTENTS);
             registerReceiver(avIndexManager, avIndexManager.MEDIA_INTENTS);
+
             avIndexManager.onResume(getApplicationContext());
         }
         addSurfaceView();
 
-        CameraInstance.GET().setCameraEventsListner(MainActivity.this);
+        CameraInstance.GET().setCameraEventsListener(MainActivity.this);
 
+        registerReceiver(wifiStateReceiver, new IntentFilter(WifiManager.WIFI_STATE_CHANGED_ACTION));
+        registerReceiver(supplicantStateReceiver, new IntentFilter(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION));
+        registerReceiver(networkStateReceiver, new IntentFilter(WifiManager.NETWORK_STATE_CHANGED_ACTION));
+        wifiManager.setWifiEnabled(true);
+        setAutoPowerOffMode(false);
+
+        /*
+        try {
+            avIndexManager.importImage(new FileInputStream(new File(Environment.getExternalStorageDirectory(), "image.jpg")));
+        } catch (IOException e) {
+            Log.e(TAG, e.toString());
+        }
+         */
     }
 
     @Override
@@ -108,6 +479,12 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
         removeSurfaceView();
         layoutHolder.removeAllViews();
         super.onPause();
+
+        unregisterReceiver(wifiStateReceiver);
+        unregisterReceiver(supplicantStateReceiver);
+        unregisterReceiver(networkStateReceiver);
+        wifiManager.setWifiEnabled(false);
+        setAutoPowerOffMode(true);
     }
 
     @Override
@@ -165,31 +542,34 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
         {
             case FRAGMENT_MIN_SHUTTER:
                 MinShutterFragment msa = new MinShutterFragment(getApplicationContext(),this);
-                getDialHandler().setDialEventListner(msa);
+                getDialHandler().setDialEventListener(msa);
                 currentLayout = msa;
                 layoutHolder.addView(msa);
                 break;
             case FRAGMENT_PREVIEWMAGNIFICATION:
                 PreviewMagnificationFragment pmf = new PreviewMagnificationFragment(getApplicationContext(),this);
-                getDialHandler().setDialEventListner(pmf);
+                getDialHandler().setDialEventListener(pmf);
                 currentLayout = pmf;
                 layoutHolder.addView(pmf);
                 break;
             case FRAGMENT_IMAGEVIEW:
                 CameraInstance.GET().closeCamera();
                 removeSurfaceView();
+                setColorDepth(true);
                 ImageFragment imageFragment = new ImageFragment(getApplicationContext(),this);
-                getDialHandler().setDialEventListner(imageFragment);
+                getDialHandler().setDialEventListener(imageFragment);
                 currentLayout = imageFragment;
                 layoutHolder.addView(imageFragment);
                 break;
             case FRAGMENT_WAITFORCAMERARDY:
+                setColorDepth(false);
                 addSurfaceView();
                 break;
             case FRAGMENT_CAMERA_UI:
             default:
+                setColorDepth(false);
                 CameraUiFragment cameraUiFragment = new CameraUiFragment(getApplicationContext(),this);
-                getDialHandler().setDialEventListner(cameraUiFragment);
+                getDialHandler().setDialEventListener(cameraUiFragment);
                 currentLayout = cameraUiFragment;
                 layoutHolder.addView(cameraUiFragment);
                 break;
@@ -198,9 +578,9 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
     }
 
     @Override
-    public void setSurfaceViewOnTouchListner(View.OnTouchListener onTouchListner) {
+    public void setSurfaceViewOnTouchListener(View.OnTouchListener onTouchListener) {
         if (surfaceView != null)
-            surfaceView.setOnTouchListener(onTouchListner);
+            surfaceView.setOnTouchListener(onTouchListener);
     }
 
     @Override
@@ -208,41 +588,15 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
         return getResources().getString(id);
     }
 
-    public void setBulbCapture(boolean bulbCapture)
-    {
-        this.isBulbCapture = bulbCapture;
-    }
-
     @Override
     public AvIndexManager getAvIndexManager() {
         return avIndexManager;
     }
 
-    public void setCaptureDoneEventListner(CaptureSession.CaptureDoneEvent eventListner)
-    {
-        this.eventListner = eventListner;
-    }
-
-    public boolean isCaptureInProgress()
-    {
-        return isCaptureInProgress;
-    }
-
-    public boolean isBulbCapture()
-    {
-        return isBulbCapture;
-    }
-
-    public void cancelBulbCapture()
-    {
-        isBulbCapture = false;
-        CameraInstance.GET().cancelCapture();
-    }
-
     @Override
     public void onCameraOpen(boolean isOpen) {
         Log.d(TAG, "onCameraOpen");
-        CameraInstance.GET().enableHwShutterButton();
+        // CameraInstance.GET().enableHwShutterButton();
         CameraInstance.GET().setShutterListener(this);
         CameraInstance.GET().setSurfaceHolder(m_surfaceHolder);
         CameraInstance.GET().startPreview();
@@ -299,21 +653,8 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
      */
     @Override
     public void onShutter(int i, CameraEx cameraEx2) {
-        Log.d(TAG, "onShutter:" + logCaptureCode(i)+ " isBulb:" + isBulbCapture);
-        Log.d(TAG, "RunMainThread: " + (Thread.currentThread() == Looper.getMainLooper().getThread()));
-        if (!isBulbCapture()) {
-
-            cameraEx2.cancelTakePicture();
-            //CameraInstance.GET().startPreview();
-            /*Caution.SetTrigger(131078, 1, false);
-            avIndexHandler.update();
-            Caution.SetMode(2, AvindexStore.getExternalMediaIds());
-            String mediaStatus =  Environment.getExternalStorageState();
-            Log.d(TAG,"MediaStatus:" + mediaStatus);*/
-            isCaptureInProgress = false;
-            if (eventListner != null)
-                eventListner.onCaptureDone();
-        }
+        // i: 0 = success, 1 = canceled, 2 = error
+        Log.d(TAG, String.format("onShutter i: %d\n", i));
     }
 
     private String logCaptureCode(int status)

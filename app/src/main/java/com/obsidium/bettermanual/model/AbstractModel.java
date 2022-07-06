@@ -9,7 +9,7 @@ import com.obsidium.bettermanual.camera.CameraInstance;
 
 public abstract class AbstractModel<T> implements Model<T> {
 
-    private Events eventsListner;
+    private Events eventsListener;
     protected boolean supported;
     protected T value;
     protected T[] values;
@@ -23,19 +23,19 @@ public abstract class AbstractModel<T> implements Model<T> {
     }
 
     @Override
-    public void setListner(Events events) {
-        this.eventsListner = events;
+    public void setListener(Events events) {
+        this.eventsListener = events;
     }
 
     protected void fireOnValueChanged()
     {
-        if (eventsListner != null)
-            handler.post(()-> eventsListner.onValueChanged());
+        if (eventsListener != null)
+            handler.post(()-> eventsListener.onValueChanged());
     }
 
     protected void fireOnSupportedChanged()
     {
-        if (eventsListner != null)
-            handler.post(()-> eventsListner.onIsSupportedChanged());
+        if (eventsListener != null)
+            handler.post(()-> eventsListener.onIsSupportedChanged());
     }
 }

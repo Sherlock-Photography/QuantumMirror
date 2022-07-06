@@ -6,7 +6,6 @@ import android.view.View;
 import com.obsidium.bettermanual.ActivityInterface;
 import com.obsidium.bettermanual.MainActivity;
 import com.obsidium.bettermanual.R;
-import com.obsidium.bettermanual.capture.CaptureModeBulb;
 import com.obsidium.bettermanual.model.ExposureModeModel;
 import com.obsidium.bettermanual.model.ShutterModel;
 import com.sony.scalar.hardware.CameraEx;
@@ -27,7 +26,7 @@ public class ShutterController extends TextViewController<ShutterModel> {
         return shutterController;
     }
 
-    private ShutterSpeedEvent shutterSpeedEventListner;
+    private ShutterSpeedEvent shutterSpeedEventListener;
     private ActivityInterface activityInterface;
 
     public void bindActivityInterface(ActivityInterface activityInterface)
@@ -40,9 +39,6 @@ public class ShutterController extends TextViewController<ShutterModel> {
     public void toggle() {
         if (ExposureModeController.GetInstance().getExposureMode() == ExposureModeModel.ExposureModes.aperture && !model.getValue().equals("BULB") && activityInterface != null)
             activityInterface.loadFragment(MainActivity.FRAGMENT_MIN_SHUTTER);
-        else if (model.getValue().equals("BULB") && CaptureModeBulb.GetInstance() != null)
-            CaptureModeBulb.GetInstance().toggle();
-
     }
 
     @Override
@@ -57,17 +53,17 @@ public class ShutterController extends TextViewController<ShutterModel> {
         return null;
     }
 
-    public void setShutterSpeedEventListner(ShutterSpeedEvent eventListner)
+    public void setShutterSpeedEventListener(ShutterSpeedEvent eventListener)
     {
-        this.shutterSpeedEventListner = eventListner;
+        this.shutterSpeedEventListener = eventListener;
     }
 
     @Override
     public void onValueChanged() {
         Log.d(TAG, "onValueChanged()");
         super.onValueChanged();
-        if (shutterSpeedEventListner != null)
-            shutterSpeedEventListner.onChanged();
+        if (shutterSpeedEventListener != null)
+            shutterSpeedEventListener.onChanged();
         if (view != null && view.getVisibility() == View.GONE && model != null)
             view.setVisibility(View.VISIBLE);
     }

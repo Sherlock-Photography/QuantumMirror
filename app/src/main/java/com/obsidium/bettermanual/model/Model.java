@@ -4,7 +4,7 @@ public interface Model<T> {
     void setValue(int i);
     T getValue();
     boolean isSupported();
-    void setListner(Events events);
+    void setListener(Events events);
 
     public interface Events
     {

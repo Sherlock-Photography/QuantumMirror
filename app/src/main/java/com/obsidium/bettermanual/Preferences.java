@@ -62,26 +62,6 @@ public class Preferences
         m_prefs.edit().putString(context.getString(R.string.ask_sceneMode), mode).apply();
     }
 
-    public String getDriveMode()
-    {
-        return m_prefs.getString(context.getString(R.string.ask_driveMode), CameraEx.ParametersModifier.DRIVE_MODE_BURST);
-    }
-
-    public void setDriveMode(String mode)
-    {
-        m_prefs.edit().putString(context.getString(R.string.ask_driveMode), mode).apply();
-    }
-
-    public String getBurstDriveSpeed()
-    {
-        return m_prefs.getString(context.getString(R.string.ask_burstDriveSpeed), CameraEx.ParametersModifier.BURST_DRIVE_SPEED_HIGH);
-    }
-
-    public void setBurstDriveSpeed(String speed)
-    {
-        m_prefs.edit().putString(context.getString(R.string.ask_burstDriveSpeed), speed).apply();
-    }
-
     public int getMinShutterSpeed()
     {
         return m_prefs.getInt(context.getString(R.string.ask_minShutterSpeed), -1);
@@ -110,16 +90,6 @@ public class Preferences
     public void setDialMode(int flags)
     {
         m_prefs.edit().putInt(context.getString(R.string.ask_dialMode), flags).apply();
-    }
-
-    public long getBulbTime()
-    {
-        return m_prefs.getLong(context.getString(R.string.ask_bulbtime), 1000);
-    }
-
-    public void setBulbTime(long time)
-    {
-        m_prefs.edit().putLong(context.getString(R.string.ask_bulbtime),time).commit();
     }
 
     public boolean showStarAlginView()

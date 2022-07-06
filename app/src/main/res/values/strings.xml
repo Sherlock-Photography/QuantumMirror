@@ -4,7 +4,7 @@
     <!ENTITY icon_top_right_dial "\uE519">
     ]>
 <resources>
-    <string name="app_name">BetterManual</string>
+    <string name="app_name">Quantum Mirror</string>
     <string name="view_aperture_navigation">&icon_top_right_dial; to change</string>
     <string name="view_iso_navigation_manual">&icon_top_right_dial; to change, &icon_enterButton; auto/manual</string>
     <string name="view_iso_navigation_auto">&icon_enterButton; auto/manual</string>

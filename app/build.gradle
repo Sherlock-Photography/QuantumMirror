@@ -5,12 +5,12 @@ android {
     buildToolsVersion '30.0.2'
 
     defaultConfig {
-        applicationId "com.obsidium.bettermanual"
+        applicationId "com.nicksherlock.quantummirror"
         minSdkVersion 10
         targetSdkVersion 10
         versionCode 14
         versionName '1.5.6'
-        archivesBaseName = "BetterManual-${versionName}"
+        archivesBaseName = "QuantumMirror-${versionName}"
     }
     buildTypes {
         release {
@@ -36,7 +36,7 @@ repositories {
 
 android.applicationVariants.all { variant ->
     variant.outputs.all {
-        outputFileName = "BetterManual-${variant.buildType.name}_${variant.versionName}.apk"
+        outputFileName = "QuantumMirror-${variant.buildType.name}_${variant.versionName}.apk"
     }
 }
 

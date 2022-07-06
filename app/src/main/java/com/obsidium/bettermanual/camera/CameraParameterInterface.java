@@ -44,11 +44,6 @@ interface CameraParameterInterface
     int getMaxExposureCompensation();
     int getMinExposureCompensation();
     float getExposureCompensationStep();
-
-    //long expo noise reduction
-    boolean isLongExposureNoiseReductionSupported();
-    void setLongExposureNoiseReduction(boolean enable);
-    boolean getLongeExposureNR();
     
     void setFocusMode(String value);
     

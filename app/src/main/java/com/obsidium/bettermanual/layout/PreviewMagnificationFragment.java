@@ -74,7 +74,7 @@ public class PreviewMagnificationFragment extends BaseLayout implements CameraEx
         starDriftAlginView.enableCenterLines(Preferences.GET().showStarAlginView());
         starDriftAlginView.enableGrid(Preferences.GET().showStarAlginViewGrid());
 
-        activityInterface.setSurfaceViewOnTouchListner(new SurfaceSwipeTouchListener(getContext()));
+        activityInterface.setSurfaceViewOnTouchListener(new SurfaceSwipeTouchListener(getContext()));
         CameraInstance.GET().setPreviewMagnificationListener(this);
         m_curPreviewMagnification = 100;
         CameraInstance.GET().setPreviewMagnification(m_curPreviewMagnification, m_curPreviewMagnificationPos);
@@ -82,7 +82,7 @@ public class PreviewMagnificationFragment extends BaseLayout implements CameraEx
 
     @Override
     public void Destroy() {
-        activityInterface.setSurfaceViewOnTouchListner(null);
+        activityInterface.setSurfaceViewOnTouchListener(null);
         FocusDriveController.GetInstance().bindView(null);
     }
 
@@ -265,7 +265,7 @@ public class PreviewMagnificationFragment extends BaseLayout implements CameraEx
 
     @Override
     public boolean onAelKeyUp() {
-        activityInterface.getDialHandler().setDefaultListner();
+        activityInterface.getDialHandler().setDefaultListener();
         CameraInstance.GET().stopPreviewMagnification();
         activityInterface.loadFragment(MainActivity.FRAGMENT_CAMERA_UI);
         return true;

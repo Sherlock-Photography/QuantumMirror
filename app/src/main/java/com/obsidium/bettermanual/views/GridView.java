@@ -35,18 +35,14 @@ public class GridView extends View
 
         if (m_videoRect != null)
         {
-            final float w = getWidth();
             final float h = getHeight();
-            final float w3 = (float) (m_videoRect.pxRight - m_videoRect.pxLeft) / 3.0f;
-            final float h3 = h / 3.0f;
+
+            final float middleX = (float) (m_videoRect.pxRight + m_videoRect.pxLeft) / 2;
+            final float squareSize = m_videoRect.pxBottom - m_videoRect.pxTop;
 
             // Vertical lines
-            canvas.drawLine(m_videoRect.pxLeft + w3, 0, m_videoRect.pxLeft + w3, h, m_paint);
-            canvas.drawLine(m_videoRect.pxLeft + w3 * 2, 0, m_videoRect.pxLeft + w3 * 2, h, m_paint);
-
-            // Horizontal lines
-            canvas.drawLine(m_videoRect.pxLeft, h3, w - m_videoRect.pxLeft, h3, m_paint);
-            canvas.drawLine(m_videoRect.pxLeft, h3 * 2, w - m_videoRect.pxLeft, h3 * 2, m_paint);
+            canvas.drawLine(middleX - squareSize / 2, 0, middleX - squareSize / 2, h, m_paint);
+            canvas.drawLine(middleX + squareSize / 2, 0, middleX + squareSize / 2, h, m_paint);
         }
     }
 }

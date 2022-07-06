@@ -12,7 +12,7 @@ import java.util.List;
  * Created by KillerInk on 30.08.2017.
  */
 
-public class BaseCamera implements CameraEventListnerInterface, CameraParameterInterface {
+public class BaseCamera implements CameraEventListenerInterface, CameraParameterInterface {
 
     private static final String TAG = BaseCamera.class.getSimpleName();
 
@@ -23,7 +23,7 @@ public class BaseCamera implements CameraEventListnerInterface, CameraParameterI
 
 
     CameraEx.AutoPictureReviewControl autoPictureReviewControl;
-    CameraEvents cameraEventsListner;
+    CameraEvents cameraEventsListener;
     CameraEx.ShutterSpeedInfo shutterSpeedInfo;
     CameraEx m_camera;
     protected boolean cameraIsOpen = false;
@@ -67,17 +67,17 @@ public class BaseCamera implements CameraEventListnerInterface, CameraParameterI
 
 
     @Override
-    public void setCameraEventsListner(CameraEvents eventsListner)
+    public void setCameraEventsListener(CameraEvents eventsListener)
     {
-        this.cameraEventsListner = eventsListner;
+        this.cameraEventsListener = eventsListener;
     }
 
     @Override
     public void fireOnCameraOpen(boolean isopen)
     {
-        if (cameraEventsListner != null)
+        if (cameraEventsListener != null)
         {
-            cameraEventsListner.onCameraOpen(true);
+            cameraEventsListener.onCameraOpen(true);
         }
     }
 
@@ -152,33 +152,6 @@ public class BaseCamera implements CameraEventListnerInterface, CameraParameterI
             ex.printStackTrace();
         }
         return ret;
-    }
-
-    public boolean isLongExposureNoiseReductionSupported()
-    {
-        try {
-            getModifier().getLongExposureNR();
-            return true;
-        }
-        catch (NoSuchMethodError ex)
-        {
-            ex.printStackTrace();
-            return false;
-        }
-    }
-
-    public void setLongExposureNoiseReduction(boolean enable)
-    {
-        Camera.Parameters parameters = getEmptyParameters();
-        CameraEx.ParametersModifier modifier = getCameraEx().createParametersModifier(parameters);
-        modifier.setLongExposureNR(enable);
-        setParameters(parameters);
-    }
-
-
-    @Override
-    public boolean getLongeExposureNR() {
-        return getModifier().getLongExposureNR();
     }
 
     public void setFocusMode(String value)

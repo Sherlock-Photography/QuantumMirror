@@ -70,7 +70,7 @@ public class IsoModel extends AbstractModel<String> implements CameraEx.AutoISOS
         return true;
     }
 
-    //AutoIsoSensitivityListner
+    //AutoIsoSensitivityListener
     @Override
     public void onChanged(int i, CameraEx cameraEx) {
         value = "\uE488 " + String.valueOf(i) + (m_curIso == 0 ? "(A)" : "");

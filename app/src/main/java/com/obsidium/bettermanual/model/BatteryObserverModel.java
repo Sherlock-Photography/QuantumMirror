@@ -40,7 +40,7 @@ public class BatteryObserverModel extends AbstractModel<String>
 
     @Override
     public String getValue() {
-        return batteryObserver.level +"/" + batteryObserver.max;
+        return Math.round((batteryObserver.level * 1.0 / batteryObserver.max) * 100) + "%";
     }
 
     @Override
