@@ -140,9 +140,6 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
         //also it seems Camera.takePicture is nonfunctional/crash on a6000
         //activityInterface.getCamera().setShutterListener(this);
 
-        //m_camera.setJpegListener(); maybe is used to get jpeg/raw data returned
-
-
         m_viewFlags = Preferences.GET().getViewFlags(0);
         setDialMode(Preferences.GET().getDialMode(0));
 

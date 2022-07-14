@@ -3,7 +3,7 @@
 This app for Android-based Sony cameras (e.g. A7, A7R, A7 II, A7R II, but not the A7 III series or newer) submits
 photos to the DALL-E 2 AI, and uses it to generate variants of the photos you take.
 
-See a list of maybe-compatible cameras here:
+See a list of maybe-compatible cameras here (I only tested the app on my A7R and α5000):
 
 https://openmemories.readthedocs.io/devices.html
 

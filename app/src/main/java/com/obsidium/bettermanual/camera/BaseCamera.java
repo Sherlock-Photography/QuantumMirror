@@ -5,6 +5,7 @@ import android.util.Log;
 import android.util.Pair;
 
 import com.sony.scalar.hardware.CameraEx;
+import com.sony.scalar.meta.FaceInfo;
 
 import java.util.List;
 
@@ -18,6 +19,8 @@ public class BaseCamera implements CameraEventListenerInterface, CameraParameter
 
     public interface CameraEvents{
         void onCameraOpen(boolean isOpen);
+
+        void onFaceDetected(FaceInfo[] faces);
     }
 
 
@@ -216,6 +219,27 @@ public class BaseCamera implements CameraEventListenerInterface, CameraParameter
     public String getBurstDriveSpeed()
     {
         return getModifier().getBurstDriveSpeed();
+    }
+
+    /**
+     *
+     * @param rate - Higher rates poll more frequently (maybe it's polls-per-second?). Minimum 1.
+     */
+    public void startFaceDetection(int rate) {
+        try {
+            getCameraEx().startFaceDetection(rate);
+
+            getCameraEx().setFaceDetectionListener(new CameraEx.FaceDetectionListener() {
+                @Override
+                public void onFaceDetected(FaceInfo[] faceInfos, CameraEx cameraEx) {
+                    if (cameraEventsListener != null) {
+                        cameraEventsListener.onFaceDetected(faceInfos);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to enable face detection, not supported?");
+        }
     }
 
     public boolean isAutoShutterSpeedLowLimitSupported()

@@ -29,6 +29,7 @@ import com.obsidium.bettermanual.layout.ImageFragment;
 import com.obsidium.bettermanual.layout.MinShutterFragment;
 import com.obsidium.bettermanual.layout.PreviewMagnificationFragment;
 import com.sony.scalar.hardware.CameraEx;
+import com.sony.scalar.meta.FaceInfo;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -73,10 +74,13 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
     private String m_bearerToken;
     private ExecutorService m_dalleExecutor = Executors.newSingleThreadExecutor();
 
+    private boolean m_facesPresent = false;
+
     private WifiManager wifiManager;
     private BroadcastReceiver wifiStateReceiver;
     private BroadcastReceiver supplicantStateReceiver;
     private BroadcastReceiver networkStateReceiver;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -424,10 +428,12 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
                         public void onPictureTaken(byte[] bytes, Camera camera) {
                             Log.d(TAG, "Captured jpeg, size: " + bytes.length);
 
-                            if (m_bearerToken != null) {
-                                runDallE(bytes);
-                            } else {
+                            if (m_bearerToken == null) {
                                 showDallEProgress("No TOKEN.TXT file found!", true);
+                            } else if (m_facesPresent) {
+                                showDallEProgress("Not uploading due to faces", true);
+                            } else {
+                                runDallE(bytes);
                             }
                         }
                     }
@@ -603,6 +609,15 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
 
 
         loadFragment(FRAGMENT_CAMERA_UI);
+    }
+
+    @Override
+    public void onFaceDetected(FaceInfo[] faces) {
+        m_facesPresent = faces != null && faces.length > 0;
+
+        if (m_facesPresent) {
+            showMessageDelayed("Warning: No faces allowed!");
+        }
     }
 
 

@@ -138,72 +138,13 @@ public class CameraInstance extends BaseCamera implements CameraSequence.Shutter
             else
                 setAutoShutterSpeedLowLimit(Preferences.GET().getMinShutterSpeed());
         }
-        // Disable self timer
-        setSelfTimer(0);
         // Force aspect ratio to 3:2
         setImageAspectRatio(CameraEx.ParametersModifier.IMAGE_ASPECT_RATIO_3_2);
         setImageQuality(CameraEx.ParametersModifier.PICTURE_STORAGE_FMT_RAWJPEG);
-        setRedEyeReduction(CameraEx.ParametersModifier.RED_EYE_REDUCTION_MODE_OFF);
-        setFlashType(CameraEx.ParametersModifier.FLASH_TYPE_SLOW_SYNC);
-        setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
-        m_camera.setFlashChargingStateListener(new CameraEx.FlashChargingStateListener() {
-            @Override
-            public void onChanged(int i, CameraEx cameraEx) {
-                Log.d(TAG, "FlashChargingStateChanged" + i);
-            }
-        });
-        m_camera.setFlashEmittingListener(new CameraEx.FlashEmittingListener() {
-            @Override
-            public void onFlash(boolean b, CameraEx cameraEx) {
-                Log.d(TAG, "FlashEmittingListener changed onFlash " + b);
-            }
-        });
-        m_camera.setFocusLightStateListener(new CameraEx.FocusLightStateListener() {
-            @Override
-            public void onChanged(boolean b, boolean b1, CameraEx cameraEx) {
-                Log.d(TAG, "FocusLightstateChanger onChange " + b + " " + b1);
-            }
-        });
 
-        /* // Throws NoClassDefFoundError on my A7R:
+        disableHwShutterButton();
 
-        m_camera.setStoreImageCompleteListener(new CameraEx.StoreImageCompleteListener() {
-            @Override
-            public void onDone(int i, CameraEx.StoreImageInfo storeImageInfo, CameraEx cameraEx) {
-                Log.d(TAG, "storeImageCompleteListener: " + i);
-                Log.d(TAG, "Fna: " + storeImageInfo.FileName);
-                Log.d(TAG, "Fno: " + storeImageInfo.FileNo);
-                Log.d(TAG, "Dna: " + storeImageInfo.DirectoryName);
-                Log.d(TAG, "Dno: " + storeImageInfo.DirectoryNo);
-                Log.d(TAG, "Mid: " + storeImageInfo.MediaId);
-            }
-        });*/
-
-        /*try {
-            m_camera.setCaptureStatusListener(new CameraEx.OnCaptureStatusListener() {
-                @Override
-                public void onEnd(int i, int i1, CameraEx cameraEx) {
-                    Log.d(TAG, "onCaptureStatusListener END");
-                }
-
-                @Override
-                public void onStart(int i, CameraEx cameraEx) {
-                    Log.d(TAG, "onCaptureStatusListener Start");
-                }
-            });
-        }
-        catch (NoClassDefFoundError ex)
-        {
-            ex.printStackTrace();
-        }*/
-            m_camera.setFaceDetectionListener(new CameraEx.FaceDetectionListener() {
-                @Override
-                public void onFaceDetected(FaceInfo[] faceInfos, CameraEx cameraEx) {
-                    Log.d(TAG, "onFaceDetected");
-                }
-            });
-
-        m_camera.stopDirectShutter(null);
+        startFaceDetection(1);
     }
 
     public void closeCamera() {
@@ -308,7 +249,7 @@ public class CameraInstance extends BaseCamera implements CameraSequence.Shutter
 
                 getCameraEx().cancelTakePicture();
             },
-            (bytes, camera) -> Log.d(TAG, "On raw " + bytes.length),
+            null, // rawCallback
             jpegCallback
         );
     }
@@ -343,10 +284,8 @@ public class CameraInstance extends BaseCamera implements CameraSequence.Shutter
         initParameters();
 
         //when false cameraparameters contains only the active parameters, but supported stuff is missing
-        // m_camera.withSupportedParameters(true); // ?
+        m_camera.withSupportedParameters(true);
     }
-
-
 
     /*public void setOptions(CameraSequence.Options paramOptions)
     {
