@@ -423,21 +423,26 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
         m_handler.post(new Runnable() {
             @Override
             public void run() {
-                CameraInstance.GET().takePictureCallback(new Camera.PictureCallback() {
-                        @Override
-                        public void onPictureTaken(byte[] bytes, Camera camera) {
-                            Log.d(TAG, "Captured jpeg, size: " + bytes.length);
+                try {
+                    CameraInstance.GET().takePictureCallback(new Camera.PictureCallback() {
+                             @Override
+                             public void onPictureTaken(byte[] bytes, Camera camera) {
+                                 Log.d(TAG, "Captured jpeg, size: " + bytes.length);
 
-                            if (m_bearerToken == null) {
-                                showDallEProgress("No TOKEN.TXT file found!", true);
-                            } else if (m_facesPresent) {
-                                showDallEProgress("Not uploading due to faces", true);
-                            } else {
-                                runDallE(bytes);
-                            }
-                        }
-                    }
-                );
+                                 if (m_bearerToken == null) {
+                                     showDallEProgress("No TOKEN.TXT file found!", true);
+                                 } else if (m_facesPresent) {
+                                     showDallEProgress("Not uploading due to faces", true);
+                                 } else {
+                                     runDallE(bytes);
+                                 }
+                             }
+                         }
+                    );
+                } catch (Exception e) {
+                    //takePicture throws an exception if the camera is busy, for example
+                    showDallEProgress("Error: " + e, true);
+                }
             }
         });
     }
