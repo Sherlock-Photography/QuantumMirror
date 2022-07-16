@@ -320,8 +320,7 @@ public class CameraUiFragment extends BaseLayout implements View.OnClickListener
     @Override
     public boolean onUpperDialChanged(int value)
     {
-
-
+        dialViews.get(lastDialView).set_In_De_crase(value);
         return true;
     }
 
