@@ -13,6 +13,8 @@ Currently, **using this app will get your DALL-E 2 account automatically banned*
 "web scraping tool" in violation of their Terms and Conditions. So check back here after DALL-E 2 has released their
 public API for a version that complies with their new terms.
 
+![Screenshot of upload in progress](screenshot.jpg)
+
 ## Installation ##
 
 We'll use [Sony-PMCA-RE](https://github.com/ma1co/Sony-PMCA-RE) to install the Quantum Mirror APK into your camera. Note
