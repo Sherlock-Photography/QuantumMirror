@@ -9,10 +9,6 @@ https://openmemories.readthedocs.io/devices.html
 
 I am not affiliated with OpenAI or Sony, this is not an official app.
 
-Currently, **using this app will get your DALL-E 2 account automatically banned**, because OpenAI consider it to be a
-"web scraping tool" in violation of their Terms and Conditions. So check back here after DALL-E 2 has released their
-public API for a version that complies with their new terms.
-
 ![Screenshot of upload in progress](screenshot.jpg)
 
 ## Installation ##
@@ -88,27 +84,31 @@ Task completed successfully
 
 ## Configuration
 
-Your Sony camera can't connect to OpenAI directly (because it only supports TLS 1.0, which is too outdated), so you need
-to deploy a backend to your Amazon AWS account that will serve as a proxy for connecting to OpenAI. To create this backend,
+Your Sony camera can't connect to OpenAI directly (because this Android version only supports TLS 1.0, which is too 
+outdated), so you need to deploy a backend to your Amazon AWS account that will serve as a proxy for connecting to 
+OpenAI. To create this backend, 
 [deploy quantum-mirror-lambda](https://github.com/Sherlock-Photography/quantum-mirror-lambda). After the deploy is
 complete, it'll give you an "EndpointForCameraTokenTxt" value to use.
 
-Create a text file in the root folder of your camera's SD Card called "TOKEN.TXT". On the first line, enter the
-EndpointForCameraTokenTxt value, e.g.:
+On the OpenAI website, generate a new API key for your account on this page:
 
-    https://xxxx.cloudfront.net/
+https://beta.openai.com/account/api-keys
 
-Now on the second line of the TOKEN.TXT file you need to provide Quantum Mirror with your DALL-E credentials.
+Now create a text file in the root folder of your camera's SD Card called "AI-SET.TXT", and paste this content into it:
 
-On the DALL-E Labs website, log in to your account, then open your browser's Developer Tools and go to the Network tab.
-Click on your "My Collection page" on the DALL-E website. Then in the network tab, examine the request for the "private" URL,
-and in the request parameters look for the "Authorization: sess-..." line. This token represents your logged-on
-DALL-E session.
+```properties
+api-key=sk-xxx
+endpoint=https://xxxx.cloudfront.net/
+size=1024x1024
+count=4
+```
 
-Copy that "sess-..." token, and paste it into the second line of your TOKEN.TXT, like so:
+On the first line replace the `sk-xxx` with the API key you got from OpenAI.
 
-    https://xxxx.cloudfront.net/
-    sess-xxxxxxxxxxxxxxxxxxxxx
+On the second line, enter your `EndpointForCameraTokenTxt` value.
+
+You can edit the size and count to change how big generated images should be and how many images should be generated in
+each batch. Valid sizes are 256x256, 512x512, or 1024x1024 (only). Valid counts are 1-10.
 
 Set up a WiFi connection in your Sony settings (e.g. to a phone WiFi hotspot), since it must be connected at the time
 you take your photo for it to be submitted to DALL-E.

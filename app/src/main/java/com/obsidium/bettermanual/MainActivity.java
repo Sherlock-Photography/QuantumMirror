@@ -41,6 +41,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
+import java.util.Properties;
 import java.util.concurrent.*;
 
 /**
@@ -73,6 +74,9 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
     private String m_endPointPrefix;
     private String m_bearerToken;
     private ExecutorService m_dalleExecutor = Executors.newSingleThreadExecutor();
+
+    private String m_genImageSize;
+    private int m_getImageCount;
 
     private boolean m_facesPresent = false;
 
@@ -125,40 +129,44 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
         };
 
         try {
-            loadBearerToken();
+            loadSettings();
         } catch (Exception e) {
-            Log.e(TAG, "Bad TOKEN.TXT file: " + e);
-            showDallEProgress("Bad TOKEN.TXT file: " + e, false);
+            Log.e(TAG, "Bad AI-SET.TXT file: " + e);
+            showDallEProgress("Bad AI-SET file: " + e, false);
         }
     }
 
-    private void loadBearerToken() throws IOException {
-        File filename = new File(Environment.getExternalStorageDirectory(), "TOKEN.TXT");
+    private void loadSettings() throws IOException {
+        File filename = new File(Environment.getExternalStorageDirectory(), "AI-SET.TXT");
 
-        Log.d(TAG, "Loading bearer token from " + filename.toString());
+        Log.d(TAG, "Loading settings from " + filename.toString());
 
-        BufferedReader reader = new BufferedReader(new FileReader(filename));
+        Properties prop = new Properties();
 
-        String line = reader.readLine().trim();
-        if (!line.startsWith("http")) {
-            throw new RuntimeException("Missing endpoint url");
+        prop.load(new FileInputStream(filename));
+
+        String endpoint = prop.getProperty("endpoint", "");
+
+        if (!endpoint.startsWith("http")) {
+            throw new RuntimeException("Missing endpoint");
         }
 
-        if (!line.endsWith("/")) {
-            line = line + "/";
+        if (!endpoint.endsWith("/")) {
+            endpoint = endpoint + "/";
         }
 
-        m_endPointPrefix = line;
+        m_endPointPrefix = endpoint;
 
-        line = reader.readLine().trim();
+        String token = prop.getProperty("api-key", "");
 
-        if (line.length() < 16) {
-            throw new RuntimeException("Missing bearer token");
+        if (token.length() < 16) {
+            throw new RuntimeException("Missing api-key");
         }
 
-        m_bearerToken = line;
+        m_bearerToken = token;
 
-        reader.close();
+        m_genImageSize = prop.getProperty("size", "1024x1024");
+        m_getImageCount = Integer.parseInt(prop.getProperty("count", "4"), 10);
     }
 
     protected void wifiStateChanged(int state) {
@@ -236,7 +244,7 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
     }
 
     private void logDallEToFile(String msg) {
-        File file = new File(Environment.getExternalStorageDirectory(), "DALL-E.TXT");
+        File file = new File(Environment.getExternalStorageDirectory(), "AI-LOG.TXT");
 
         try {
             BufferedWriter writer = new BufferedWriter(new FileWriter(file, true));
@@ -250,7 +258,7 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
     }
 
     private JSONObject uploadDallEPicture(final byte[] bytes) throws IOException, JSONException {
-        URL u = new URL(m_endPointPrefix + "submitImage");
+        URL u = new URL(m_endPointPrefix + "submitImage?size=" + m_genImageSize + "&count=" + m_getImageCount);
 
         HttpURLConnection c = (HttpURLConnection) u.openConnection();
 
@@ -284,29 +292,8 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
         return (JSONObject) new JSONTokener(readStreamAsString(in)).nextValue();
     }
 
-    private JSONObject pollDallETask(final String taskID) throws IOException, JSONException {
-        URL u = new URL(m_endPointPrefix + "pollTask/" + taskID);
-
-        HttpURLConnection c = (HttpURLConnection) u.openConnection();
-
-        c.setUseCaches(false);
-        c.setRequestMethod("GET");
-        c.setRequestProperty("X-Authorization", "Bearer " + m_bearerToken);
-        c.setDoInput(true);
-
-        c.connect();
-
-        if (c.getResponseCode() != HttpURLConnection.HTTP_OK) {
-            throw new IOException("HTTP error " + c.getResponseCode() + " (" + c.getResponseMessage() + ")");
-        }
-
-        InputStream in = c.getInputStream();
-
-        return (JSONObject) new JSONTokener(readStreamAsString(in)).nextValue();
-    }
-
     private InputStream startDallEImageDownload(String url) throws IOException {
-        URL u = new URL(url.replace("https://openailabsprodscus.blob.core.windows.net/", m_endPointPrefix + "getImage/"));
+        URL u = new URL(url.replace("https://oaidalleapiprodscus.blob.core.windows.net/", m_endPointPrefix + "getImage/"));
 
         HttpURLConnection c = (HttpURLConnection) u.openConnection();
 
@@ -340,60 +327,29 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
 
             try {
                 JSONObject responseJSON = uploadDallEPicture(jpegBytes);
-                String status = responseJSON.optString("status", "failed");
-                String taskID;
-                boolean success = false;
 
-                if (!("success".equals(status) || "pending".equals(status))) {
-                    // Check for a friendly-formatted error from OpenAI
-                    if (responseJSON.getJSONObject("error") != null) {
-                        String message = responseJSON.getJSONObject("error").getString("message");
+                // Check for a friendly-formatted error from OpenAI:
+                JSONObject error = responseJSON.optJSONObject("error");
 
-                        Log.e(TAG, "Upload error: " + message);
-                        logDallEToFile("Upload error: " + message);
-                        showDallEProgress("Error: " + message, false);
+                if (error != null) {
+                    String message = error.getString("message");
 
-                        return;
-                    }
+                    Log.e(TAG, "Upload error: " + message);
+                    logDallEToFile("Upload error: " + message);
+                    showDallEProgress("Error: " + message, false);
 
-                    throw new RuntimeException("Task submit failed");
-                }
-
-                taskID = responseJSON.getString("id");
-
-                logDallEToFile("Submitted: https://labs.openai.com/e/" + taskID.replace("task-", ""));
-
-                for (int i = 0; i < 40; i++) {
-                    Log.d(TAG, "DALL-e task status: " + status);
-
-                    if ("pending".equals(status)) {
-                        showDallEProgress("AI working...", false);
-
-                        Thread.sleep(3000);
-                        responseJSON = pollDallETask(taskID);
-
-                        status = responseJSON.getString("status");
-                    } else if ("succeeded".equals(status)) {
-                        success = true;
-                        break;
-                    } else {
-                        throw new RuntimeException("Task failed");
-                    }
-                }
-
-                if (!success) {
-                    throw new RuntimeException("Timed out waiting for AI");
+                    return;
                 }
 
                 showDallEProgress("Downloading images...", false);
 
-                JSONArray generations = responseJSON.getJSONObject("generations").getJSONArray("data");
+                JSONArray generations = responseJSON.getJSONArray("data");
 
                 CountDownLatch downloadCounter = new CountDownLatch(generations.length());
 
                 for (int i = 0; i < generations.length(); i++) {
                     JSONObject generation = generations.getJSONObject(i);
-                    final String imageURL = generation.getJSONObject("generation").getString("image_path");
+                    final String imageURL = generation.getString("url");
 
                     m_handler.post(() -> {
                         try {
@@ -430,7 +386,7 @@ public class MainActivity extends BaseActivity implements ActivityInterface, Cam
                                  Log.d(TAG, "Captured jpeg, size: " + bytes.length);
 
                                  if (m_bearerToken == null) {
-                                     showDallEProgress("No TOKEN.TXT file found!", true);
+                                     showDallEProgress("No AI-SET.TXT file found!", true);
                                  } else if (m_facesPresent) {
                                      showDallEProgress("Not uploading due to faces", true);
                                  } else {
