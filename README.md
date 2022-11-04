@@ -9,6 +9,10 @@ https://openmemories.readthedocs.io/devices.html
 
 I am not affiliated with OpenAI or Sony, this is not an official app.
 
+You can see a gallery of sample photos I took here:
+
+https://www.quantum-mirror.com/
+
 ![Screenshot of upload in progress](screenshot.jpg)
 
 ## Installation ##
